@@ -40,6 +40,7 @@ export type Health = {
   workspace: string;
   sessionToken: string;
   version: string;
+  workspacePicker?: boolean;
 };
 export type FileEntry = {
   name: string;

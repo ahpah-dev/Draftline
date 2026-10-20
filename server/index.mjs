@@ -11,6 +11,7 @@ import {
   settleInterruptedTools,
 } from "./agent.mjs";
 import { listFiles, readFile, inside } from "./paths.mjs";
+import { pickDirectory as nativePickDirectory } from "./folder-picker.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const types = {
@@ -53,11 +54,21 @@ export async function createRuntime({
   port = 4318,
   allowedOrigins = [],
   staticDir = path.join(here, "..", "dist"),
+  pickDirectory = nativePickDirectory,
 } = {}) {
-  const root = await fs.realpath(path.resolve(workspace));
+  let root = await fs.realpath(path.resolve(workspace));
   if (!(await fs.stat(root)).isDirectory())
     throw new Error("Workspace must be a directory.");
-  const sessionToken = randomBytes(32).toString("hex");
+  let sessionToken = randomBytes(32).toString("hex");
+  let folderSelection = null;
+  const health = () => ({
+    ok: true,
+    version: "1.0.0",
+    workspace: root,
+    sessionToken,
+    workspacePicker: true,
+    providers: ["ollama", "llamacpp"],
+  });
   const configuredOrigins = new Set(
     allowedOrigins.map((origin) => {
       const url = new URL(origin);
@@ -134,13 +145,7 @@ export async function createRuntime({
       }
       const url = new URL(request.url, "http://127.0.0.1");
       if (url.pathname === "/api/health" && request.method === "GET")
-        return send(200, {
-          ok: true,
-          version: "1.0.0",
-          workspace: root,
-          sessionToken,
-          providers: ["ollama", "llamacpp"],
-        });
+        return send(200, health());
       if (
         url.pathname.startsWith("/api/") &&
         !sameToken(request.headers["x-session-token"], sessionToken)
@@ -149,6 +154,54 @@ export async function createRuntime({
           error:
             "Local bridge session is missing or expired. Reconnect to the bridge.",
         });
+      if (url.pathname === "/api/workspace/pick" && request.method === "POST") {
+        const body = await jsonBody(request);
+        if (!sameToken(request.headers["x-session-token"], sessionToken))
+          return send(401, {
+            error: "The workspace session changed. Reconnect to the runtime.",
+          });
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          Object.keys(body).length
+        )
+          return send(400, {
+            error:
+              "Folder selection takes no path arguments. Choose a folder in the system dialog.",
+          });
+        if (folderSelection || runs.size)
+          return send(409, {
+            error:
+              "Finish or stop the current task or folder selection before changing workspaces.",
+          });
+        const controller = new AbortController();
+        folderSelection = controller;
+        const disconnected = () => {
+          if (!response.writableEnded) controller.abort();
+        };
+        response.on("close", disconnected);
+        try {
+          const chosen = await pickDirectory(root, controller.signal);
+          if (controller.signal.aborted) return;
+          if (chosen === null)
+            return send(200, { ...health(), cancelled: true });
+          if (typeof chosen !== "string" || !path.isAbsolute(chosen))
+            throw new Error("The folder picker did not return a valid folder.");
+          const selectedRoot = await fs.realpath(chosen);
+          if (!(await fs.stat(selectedRoot)).isDirectory())
+            throw new Error("Select a project folder, not a file.");
+          if (controller.signal.aborted) return;
+          if (selectedRoot !== root) {
+            root = selectedRoot;
+            sessionToken = randomBytes(32).toString("hex");
+          }
+          return send(200, { ...health(), cancelled: false });
+        } finally {
+          response.removeListener("close", disconnected);
+          folderSelection = null;
+        }
+      }
       if (url.pathname === "/api/connect" && request.method === "POST") {
         const config = providerConfig(await jsonBody(request));
         const available = await models(config);
@@ -211,6 +264,14 @@ export async function createRuntime({
             error: "At most four runs may be active at once.",
           });
         const input = await jsonBody(request);
+        if (!sameToken(request.headers["x-session-token"], sessionToken))
+          return send(401, {
+            error: "The workspace session changed. Reconnect to the runtime.",
+          });
+        if (folderSelection)
+          return send(409, {
+            error: "Close the folder picker before starting a task.",
+          });
         const config = providerConfig(input);
         if (!config.model)
           throw new Error("Select a model before starting a run.");
@@ -333,8 +394,12 @@ export async function createRuntime({
   server.requestTimeout = 0;
   return {
     server,
-    workspace: root,
-    sessionToken,
+    get workspace() {
+      return root;
+    },
+    get sessionToken() {
+      return sessionToken;
+    },
     listen: () =>
       new Promise((resolve, reject) => {
         server.once("error", reject);
@@ -345,6 +410,7 @@ export async function createRuntime({
       }),
     close: () =>
       new Promise((resolve, reject) => {
+        folderSelection?.abort();
         for (const run of runs.values()) run.controller.abort();
         server.close((error) => (error ? reject(error) : resolve()));
         server.closeIdleConnections();
@@ -383,7 +449,7 @@ if (
     const options = parseArgs(process.argv.slice(2));
     if (options.help)
       console.log(
-        "Codex Local bridge\n\nnode server/index.mjs [--workspace <directory>] [--port 4318] [--allow-origin https://name.github.io]\n\nBinds to 127.0.0.1. Workspace is fixed until the bridge restarts.",
+        "Codex Local bridge\n\nnode server/index.mjs [--workspace <directory>] [--port 4318] [--allow-origin https://name.github.io]\n\nBinds to 127.0.0.1. Use Open folder in the app to choose or switch projects.",
       );
     else {
       const runtime = await createRuntime(options);

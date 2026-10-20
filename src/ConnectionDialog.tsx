@@ -117,7 +117,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
   const needsOrigin = !["localhost", "127.0.0.1", "[::1]", "::1"].includes(
     window.location.hostname,
   );
-  const setupCommand = `git clone https://github.com/ahpah-dev/codex-local.git\ncd codex-local\nnpm install\nnpm run build\nnpm start -- --workspace /path/to/project${needsOrigin ? ` --origin ${origin}` : ""}`;
+  const setupCommand = `git clone https://github.com/ahpah-dev/codex-local.git\ncd codex-local\nnpm install\nnpm run build\nnpm start${needsOrigin ? ` -- --origin ${origin}` : ""}`;
 
   function update(field: keyof Settings, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -498,8 +498,8 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
             <span>Set up the local runtime</span>
           </summary>
           <p className="muted">
-            Install Node.js 22 or later. Run these commands in your terminal and
-            replace <code>/path/to/project</code> with your project folder.
+            Install Node.js 22 or later and run these commands in your terminal.
+            Once the runtime is running, use Open folder to choose your project.
           </p>
           <div className="conn-code-wrap">
             <pre className="code-block">

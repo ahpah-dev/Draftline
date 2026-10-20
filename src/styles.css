@@ -2602,3 +2602,73 @@ code {
 .composer textarea {
   border-radius: 26px 26px 0 0;
 }
+.workspace-select-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+  margin-bottom: -16px;
+}
+.workspace-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.workspace-select:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.workspace-select > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.workspace-dialog {
+  max-width: 560px;
+}
+.workspace-error {
+  margin-top: 16px;
+}
+.workspace-setup {
+  border-top: 1px solid var(--line);
+  margin-top: 21px;
+  padding-top: 20px;
+}
+.workspace-setup > strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.workspace-setup > p {
+  margin-top: 9px;
+  font-size: 11px;
+}
+.workspace-setup .code-block {
+  padding-right: 42px;
+}
+.workspace-dialog .conn-footer {
+  gap: 10px;
+}
+.workspace-dialog .conn-footer .button {
+  white-space: normal;
+}
+@media (max-width: 640px) {
+  .workspace-select {
+    font-size: 11px;
+    padding: 7px 11px;
+  }
+  .workspace-select-row {
+    margin-top: 18px;
+    margin-bottom: -12px;
+  }
+}

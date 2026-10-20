@@ -15,16 +15,20 @@ git clone https://github.com/ahpah-dev/codex-local.git
 cd codex-local
 npm install
 npm run build
-npm start -- --workspace /absolute/path/to/your/project
+npm start
 ```
 
-Open [localhost:4318](http://localhost:4318). On Windows, quote a project path containing spaces:
+Open [localhost:4318](http://localhost:4318), then click **Open folder** and choose your project in the normal system folder picker. You can also switch folders from the workspace button at the bottom of the sidebar or the file drawer. Selecting a folder does not require a connected model. Cancel keeps the previous project open.
+
+The runtime must be running on a desktop computer for its native picker. Windows uses the Explorer folder dialog, macOS uses the system chooser, and Linux uses `zenity` or `kdialog`. Folder changes are blocked while an agent task is active.
+
+You can still preselect a project when starting the runtime. On Windows, quote paths containing spaces:
 
 ```powershell
 npm start -- --workspace "C:\Users\you\Projects\my-app"
 ```
 
-The workspace argument selects the project the agent may access. Start with a small, version-controlled project so proposed changes are easy to review.
+The workspace argument is optional. Start with a small, version-controlled project so proposed changes are easy to review.
 
 ## Connect a model
 
@@ -47,7 +51,7 @@ Use the model’s recommended template and server options. `--jinja` enables the
 
 ## Working with the agent
 
-1. Start the local runtime with your project’s workspace path.
+1. Start the local runtime and choose **Open folder** in the app.
 2. Connect your provider and model.
 3. Describe a concrete coding task. The agent can request workspace tools as it works.
 4. Review approval requests before allowing operations that change files or run commands.
@@ -76,7 +80,7 @@ Run Codex Local only with projects and model servers you trust. Treat repository
 - **Shell commands run as your operating system user after per-call approval. This is not an operating system sandbox.** A command may access files, networks, credentials, and installed tools available to your account. Workspace path checks on file tools do not confine shell commands.
 - Use a disposable checkout, container, or restricted user account when stronger isolation is required. Keep secrets out of the project and review changes with Git.
 - Keep the local runtime bound to your own machine. Do not expose it publicly or place it behind a public tunnel without implementing an appropriate authentication and isolation layer.
-- Browser task history is saved in local storage on this device. Clearing site data removes it. Runtime session tokens stay in memory and expire when the runtime restarts.
+- Browser task history is saved in local storage on this device. Clearing site data removes it. Runtime session tokens stay in memory and expire when the runtime restarts or a different folder is selected.
 
 Your configured provider processes prompts and tool results. With a locally hosted provider, those requests go to that local server; any additional network behavior depends on the server, model configuration, and approved commands.
 

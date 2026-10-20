@@ -23,7 +23,6 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Search,
-  Settings2,
   ShieldCheck,
   SquarePen,
   Square,
@@ -34,6 +33,7 @@ import {
 import ConnectionDialog from "./ConnectionDialog";
 import AppearanceMenu from "./AppearanceMenu";
 import ModeMenu from "./ModeMenu";
+import WorkspaceDialog from "./WorkspaceDialog";
 import { health as getHealth, request, streamRun } from "./api";
 import { exampleFiles, initialThreads, suggestions } from "./demo";
 import type {
@@ -159,6 +159,9 @@ export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [connected, setConnected] = useState(false);
   const [showConnection, setShowConnection] = useState(false);
+  const [showWorkspace, setShowWorkspace] = useState(false);
+  const [pickingWorkspace, setPickingWorkspace] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<"agent" | "ask">("agent");
   const [busy, setBusy] = useState(false);
@@ -184,6 +187,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const controller = useRef<AbortController | null>(null);
   const initialConnection = useRef<AbortController | null>(null);
+  const workspaceController = useRef<AbortController | null>(null);
   const pendingDecision = useRef<string | null>(null);
   const runId = useRef("");
   const textArea = useRef<HTMLTextAreaElement>(null);
@@ -194,7 +198,9 @@ export default function App() {
   const focusComposer = useRef(false);
   const active = threads.find((t) => t.id === selected);
   const workspace =
-    health?.workspace?.split(/[\\/]/).filter(Boolean).at(-1) || "my-next-idea";
+    health?.workspace?.split(/[\\/]/).filter(Boolean).at(-1) ||
+    health?.workspace ||
+    "my-next-idea";
   const toolCount = threads.reduce(
     (sum, t) =>
       sum +
@@ -335,7 +341,7 @@ export default function App() {
     let live = true;
     setFileError("");
     setFileLoading(true);
-    if (!connected || !health) {
+    if (!health) {
       setFiles(
         Object.keys(exampleFiles)
           .filter((p) => !folder || p.startsWith(folder))
@@ -364,7 +370,7 @@ export default function App() {
   }, [rightTab, folder, connected, health, settings.runtimeUrl]);
 
   function openConnection() {
-    if (busy) {
+    if (busy || pickingWorkspace) {
       setToast("Stop the current task before changing connections");
       return;
     }
@@ -372,8 +378,83 @@ export default function App() {
     setMobileSidebar(false);
     setShowConnection(true);
   }
+  async function chooseWorkspace(runtimeUrl = settings.runtimeUrl) {
+    if (busy || workspaceController.current) {
+      if (busy) setToast("Stop the current task before changing folders");
+      return;
+    }
+    const abort = new AbortController();
+    workspaceController.current = abort;
+    initialConnection.current?.abort();
+    setMobileSidebar(false);
+    setPickingWorkspace(true);
+    setWorkspaceError("");
+    try {
+      const parsed = new URL(runtimeUrl);
+      if (
+        !["http:", "https:"].includes(parsed.protocol) ||
+        !["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname) ||
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash ||
+        parsed.pathname !== "/"
+      )
+        throw new Error(
+          "Enter a local runtime URL such as http://127.0.0.1:4318.",
+        );
+      const nextSettings = { ...settings, runtimeUrl: parsed.origin };
+      let current: Health;
+      try {
+        current = await getHealth(
+          nextSettings,
+          AbortSignal.any([abort.signal, AbortSignal.timeout(5000)]),
+        );
+      } catch (error) {
+        if (abort.signal.aborted) throw error;
+        throw new Error(
+          "The local runtime is not reachable. Start it with the command below, then choose your folder.",
+        );
+      }
+      if (!current.workspacePicker)
+        throw new Error(
+          "This runtime needs an update to open the system folder picker. Update your checkout and restart the runtime using the steps below.",
+        );
+      const opened = await request<Health & { cancelled: boolean }>(
+        nextSettings.runtimeUrl,
+        "/api/workspace/pick",
+        current.sessionToken,
+        {},
+        undefined,
+        abort.signal,
+      );
+      if (opened.cancelled || abort.signal.aborted) return;
+      setSettings(nextSettings);
+      setHealth(opened);
+      if (nextSettings.runtimeUrl !== settings.runtimeUrl) setConnected(false);
+      setSelected(null);
+      setPrompt("");
+      setError("");
+      setFolder("");
+      setOpenFile(null);
+      setView("workspace");
+      setRightTab("files");
+      setShowWorkspace(false);
+      setToast(
+        `Opened ${opened.workspace.split(/[\\/]/).filter(Boolean).at(-1) || opened.workspace}`,
+      );
+    } catch (error) {
+      if (!abort.signal.aborted) {
+        setWorkspaceError((error as Error).message);
+        setShowWorkspace(true);
+      }
+    } finally {
+      workspaceController.current = null;
+      setPickingWorkspace(false);
+    }
+  }
   function newTask() {
-    if (busy) return;
+    if (busy || pickingWorkspace) return;
     focusComposer.current = true;
     setSelected(null);
     setView("workspace");
@@ -404,7 +485,7 @@ export default function App() {
     setFileLoading(true);
     setFileError("");
     try {
-      if (!connected || !health) {
+      if (!health) {
         setOpenFile({
           path: entry.path,
           content: exampleFiles[entry.path] || "",
@@ -426,7 +507,7 @@ export default function App() {
   async function submit(event?: FormEvent, supplied?: string) {
     event?.preventDefault();
     const value = (supplied ?? prompt).trim();
-    if (!value || busy) return;
+    if (!value || busy || pickingWorkspace) return;
     setError("");
     setPrompt("");
     setBusy(true);
@@ -645,7 +726,7 @@ export default function App() {
             : "Describe a task, ask a question, or start building…"
         }
         value={prompt}
-        disabled={busy}
+        disabled={busy || pickingWorkspace}
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -667,7 +748,11 @@ export default function App() {
           >
             <Plus size={21} />
           </button>
-          <ModeMenu mode={mode} onChange={setMode} disabled={busy} />
+          <ModeMenu
+            mode={mode}
+            onChange={setMode}
+            disabled={busy || pickingWorkspace}
+          />
           <span className="composer-divider" />
           <button
             type="button"
@@ -691,7 +776,7 @@ export default function App() {
         ) : (
           <button
             className="send-button"
-            disabled={!prompt.trim()}
+            disabled={!prompt.trim() || pickingWorkspace}
             aria-label="Send task"
           >
             <ArrowUp size={19} />
@@ -856,9 +941,10 @@ export default function App() {
         <div className="sidebar-bottom">
           <button
             className="workspace-switch"
-            aria-label={`Model connection for ${workspace}`}
-            onClick={() => openConnection()}
-            disabled={busy}
+            aria-label="Open project folder"
+            title={health?.workspace || "Choose a project folder"}
+            onClick={() => void chooseWorkspace()}
+            disabled={busy || pickingWorkspace}
           >
             <span className="workspace-avatar">
               {workspace[0].toUpperCase()}
@@ -866,10 +952,18 @@ export default function App() {
             <span>
               {workspace}
               <small>
-                {connected ? "Local workspace" : "Connect your workspace"}
+                {pickingWorkspace
+                  ? "Choose a folder in the system dialog…"
+                  : health
+                    ? "Change project folder"
+                    : "Open a project folder"}
               </small>
             </span>
-            <Settings2 size={15} />
+            {pickingWorkspace ? (
+              <Loader2 size={15} className="spin" />
+            ) : (
+              <FolderOpen size={15} />
+            )}
           </button>
         </div>
       </aside>
@@ -901,7 +995,11 @@ export default function App() {
             </span>
           </div>
           <div className="topbar-actions">
-            {!connected && <span className="preview-badge">Preview</span>}
+            {!connected && (
+              <span className="preview-badge">
+                {health ? "No model" : "Preview"}
+              </span>
+            )}
             <AppearanceMenu />
             <button
               className={`icon-button files-toggle ${rightTab === "files" ? "active" : ""}`}
@@ -952,6 +1050,26 @@ export default function App() {
                   </div>
                   <h1>What do you want to build?</h1>
                   <p>Plan, write, and improve code with your local models.</p>
+                </div>
+                <div className="workspace-select-row">
+                  <button
+                    className="workspace-select"
+                    onClick={() => void chooseWorkspace()}
+                    disabled={busy || pickingWorkspace}
+                    title={health?.workspace || "Choose your project folder"}
+                  >
+                    {pickingWorkspace ? (
+                      <Loader2 size={15} className="spin" />
+                    ) : (
+                      <FolderOpen size={15} />
+                    )}
+                    <span>
+                      {pickingWorkspace
+                        ? "Waiting for folder selection…"
+                        : "Open folder"}
+                    </span>
+                    <ChevronDown size={12} />
+                  </button>
                 </div>
                 {composer}
                 <div className="suggestions">
@@ -1294,15 +1412,15 @@ export default function App() {
                   <div>
                     <h2>Open your workspace</h2>
                     <p>
-                      Install Codex Local, build the app, and start the runtime
-                      in the project you want to work on.
+                      Install Codex Local, build the app, and start the runtime.
+                      Then choose your project using Open folder.
                     </p>
                     <div className="code-block">
                       <button
                         className="icon-button"
                         onClick={() =>
                           void copy(
-                            "git clone https://github.com/ahpah-dev/codex-local.git\ncd codex-local\nnpm install\nnpm run build\nnpm start -- --workspace /path/to/project",
+                            "git clone https://github.com/ahpah-dev/codex-local.git\ncd codex-local\nnpm install\nnpm run build\nnpm start",
                           )
                         }
                         aria-label="Copy setup commands"
@@ -1312,12 +1430,12 @@ export default function App() {
                       <pre>
                         git clone https://github.com/ahpah-dev/codex-local.git
                         {`\n`}cd codex-local{`\n`}npm install{`\n`}npm run build
-                        {`\n`}npm start -- --workspace /path/to/project
+                        {`\n`}npm start
                       </pre>
                     </div>
                     <p className="small-text">
-                      Then open <code>http://127.0.0.1:4318</code>. On Windows,
-                      quote paths containing spaces.
+                      Then open <code>http://127.0.0.1:4318</code> and click
+                      Open folder.
                     </p>
                   </div>
                 </div>
@@ -1365,18 +1483,33 @@ export default function App() {
                   <FolderOpen size={17} />
                   <strong>Workspace files</strong>
                 </div>
-                <button
-                  className="icon-button"
-                  aria-label="Close files panel"
-                  title="Close files"
-                  onClick={() => setRightTab("overview")}
-                >
-                  <PanelRightClose size={18} />
-                </button>
+                <div className="file-drawer-actions">
+                  <button
+                    className="icon-button"
+                    aria-label="Choose project folder"
+                    title="Open folder"
+                    onClick={() => void chooseWorkspace()}
+                    disabled={busy || pickingWorkspace}
+                  >
+                    {pickingWorkspace ? (
+                      <Loader2 size={17} className="spin" />
+                    ) : (
+                      <FolderOpen size={17} />
+                    )}
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Close files panel"
+                    title="Close files"
+                    onClick={() => setRightTab("overview")}
+                  >
+                    <PanelRightClose size={18} />
+                  </button>
+                </div>
               </div>
               <div className="file-panel">
                 <div className="panel-section-heading">
-                  {connected ? "WORKSPACE FILES" : "SAMPLE FILES"}
+                  {health ? "WORKSPACE FILES" : "SAMPLE FILES"}
                   <button
                     className="icon-button"
                     title="Go to root"
@@ -1425,7 +1558,7 @@ export default function App() {
                     {entry.type === "directory" && <ChevronRight size={12} />}
                   </button>
                 ))}
-                {!connected && (
+                {!health && (
                   <p className="sample-notice">
                     Illustrative project. Connect locally to browse your files.
                   </p>
@@ -1454,7 +1587,7 @@ export default function App() {
             <span
               className={"status-dot " + (connected ? "connected" : "neutral")}
             />
-            {connected ? "Local runtime connected" : "Preview workspace"}
+            {health ? "Local runtime connected" : "Preview workspace"}
           </span>
           <span className="footer-safety">
             Codex Local can make mistakes. Review its work.
@@ -1480,6 +1613,18 @@ export default function App() {
             setShowConnection(false);
             setToast("Local model connected");
           }}
+        />
+      )}
+      {showWorkspace && (
+        <WorkspaceDialog
+          settings={settings}
+          error={workspaceError}
+          busy={pickingWorkspace}
+          onClose={() => {
+            workspaceController.current?.abort();
+            setShowWorkspace(false);
+          }}
+          onRetry={(url) => void chooseWorkspace(url)}
         />
       )}
       {toast && (
