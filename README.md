@@ -93,7 +93,7 @@ Your configured provider processes prompts and tool results. With a locally host
 | The model writes tool JSON as text   | Confirm native tool support and the correct chat template. For llama.cpp, check `--jinja` and the model’s function-calling instructions.        |
 | Tool calls are rejected              | Read the tool result, check the arguments, and retry with a compatible model. Never paste model-generated commands into a shell without review. |
 | A file cannot be read or edited      | Confirm the runtime was started with the intended workspace. File tools cannot reach outside it.                                                |
-| Generation is slow or stops          | Check the provider logs, available RAM/VRAM, model size, context size, and provider timeout settings.                                           |
+| Generation is slow or stops          | There is no app-imposed model or command deadline. Check provider logs, RAM/VRAM, context limits, and any provider-side limits; Stop is always available.                                           |
 | The Pages demo cannot edit a project | Start the local runtime and open its localhost address. The published site is static.                                                           |
 
 When reporting a problem, include your operating system, Node.js version, provider/version, model identifier, and a redacted reproduction. Do not include credentials or private project contents.

@@ -1,3 +1,5 @@
+import { AnimatePresence, m } from "motion/react";
+import { menuMotion } from "./motion";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown, MessageSquare, Terminal } from "lucide-react";
 
@@ -120,41 +122,44 @@ export default function ModeMenu({
         <span>{selected.label}</span>
         <ChevronDown size={12} aria-hidden="true" />
       </button>
-      {open && !disabled && (
-        <div
-          className="appearance-menu mode-menu"
-          id={menuId}
-          role="menu"
-          aria-label="Task mode"
-          onKeyDown={navigateMenu}
-        >
-          {options.map(({ value, label, description, Icon }, index) => (
-            <button
-              className={`mode-option${value === mode ? " active" : ""}`}
-              key={value}
-              type="button"
-              role="menuitemradio"
-              aria-checked={value === mode}
-              tabIndex={-1}
-              ref={(element) => {
-                optionRefs.current[index] = element;
-              }}
-              onClick={() => {
-                onChange(value);
-                setOpen(false);
-                triggerRef.current?.focus();
-              }}
-            >
-              <Icon size={17} aria-hidden="true" />
-              <span className="mode-option-copy">
-                <strong>{label}</strong>
-                <span>{description}</span>
-              </span>
-              {value === mode && <Check size={15} aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {open && !disabled && (
+          <m.div
+            {...menuMotion}
+            className="appearance-menu mode-menu"
+            id={menuId}
+            role="menu"
+            aria-label="Task mode"
+            onKeyDown={navigateMenu}
+          >
+            {options.map(({ value, label, description, Icon }, index) => (
+              <button
+                className={`mode-option${value === mode ? " active" : ""}`}
+                key={value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={value === mode}
+                tabIndex={-1}
+                ref={(element) => {
+                  optionRefs.current[index] = element;
+                }}
+                onClick={() => {
+                  onChange(value);
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+              >
+                <Icon size={17} aria-hidden="true" />
+                <span className="mode-option-copy">
+                  <strong>{label}</strong>
+                  <span>{description}</span>
+                </span>
+                {value === mode && <Check size={15} aria-hidden="true" />}
+              </button>
+            ))}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

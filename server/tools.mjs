@@ -136,7 +136,6 @@ async function runCommand(root, args, signal) {
     });
     let stdout = "";
     let stderr = "";
-    let timedOut = false;
     let truncated = false;
     const collect = (which) => (data) => {
       const current = which === "stdout" ? stdout : stderr;
@@ -167,13 +166,8 @@ async function runCommand(root, args, signal) {
         }
       }
     };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      stop();
-    }, 30_000);
     signal?.addEventListener("abort", stop, { once: true });
     const cleanup = () => {
-      clearTimeout(timer);
       signal?.removeEventListener("abort", stop);
     };
     child.on("error", (error) => {
@@ -188,7 +182,7 @@ async function runCommand(root, args, signal) {
         exitCode: code,
         stdout,
         stderr,
-        timedOut,
+        timedOut: false,
         cancelled: Boolean(signal?.aborted),
         signal: terminationSignal,
         truncated,

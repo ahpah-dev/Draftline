@@ -84,6 +84,17 @@ export async function createRuntime({
   );
   const runs = new Map();
   const approvals = new Map();
+  const providerRequests = new Set();
+  const providerController = (response) => {
+    const controller = new AbortController();
+    providerRequests.add(controller);
+    response.once("close", () => {
+      providerRequests.delete(controller);
+      if (!response.writableEnded) controller.abort();
+    });
+    if (response.destroyed) controller.abort();
+    return controller;
+  };
   const allowedOrigin = (origin) => {
     if (!origin) return true;
     if (configuredOrigins.has(origin)) return true;
@@ -204,7 +215,8 @@ export async function createRuntime({
       }
       if (url.pathname === "/api/connect" && request.method === "POST") {
         const config = providerConfig(await jsonBody(request));
-        const available = await models(config);
+        const controller = providerController(response);
+        const available = await models(config, controller.signal);
         if (!available.length)
           throw new Error(
             "No models are available. Install or load a tool-capable model in the provider.",
@@ -233,10 +245,7 @@ export async function createRuntime({
         );
       if (url.pathname === "/api/diagnostics" && request.method === "POST") {
         const config = providerConfig(await jsonBody(request));
-        const controller = new AbortController();
-        response.on("close", () => {
-          if (!response.writableEnded) controller.abort();
-        });
+        const controller = providerController(response);
         return send(200, await diagnostics(config, controller.signal));
       }
       const approvalId = /^\/api\/approvals\/([^/]+)$/.exec(url.pathname)?.[1];
@@ -298,7 +307,6 @@ export async function createRuntime({
           new Promise((resolve, reject) => {
             const id = randomUUID();
             const clear = () => {
-              clearTimeout(timer);
               approvals.delete(id);
               activeRun.controller.signal.removeEventListener("abort", abort);
             };
@@ -306,10 +314,6 @@ export async function createRuntime({
               clear();
               reject(new Error("Run cancelled."));
             };
-            const timer = setTimeout(() => {
-              clear();
-              resolve(false);
-            }, 600_000);
             approvals.set(id, {
               resolve: (approved) => {
                 clear();
@@ -411,6 +415,7 @@ export async function createRuntime({
     close: () =>
       new Promise((resolve, reject) => {
         folderSelection?.abort();
+        for (const controller of providerRequests) controller.abort();
         for (const run of runs.values()) run.controller.abort();
         server.close((error) => (error ? reject(error) : resolve()));
         server.closeIdleConnections();

@@ -146,7 +146,9 @@ code {
   padding: 15px 12px 12px;
   background: var(--sidebar);
   z-index: 30;
-  transition: width 0.2s;
+  transition:
+    width 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s;
 }
 .sidebar-top {
   display: flex;
@@ -2544,6 +2546,65 @@ code {
   .runtime-card-action {
     font-size: 0;
   }
+}
+/* Keep motion on the compositor; avoid animating layout on conversation rows. */
+.app-shell,
+.topbar,
+.context-panel,
+.composer,
+.modal,
+.appearance-menu {
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.appearance-menu {
+  transform-origin: top right;
+}
+.mode-menu {
+  transform-origin: bottom left;
+}
+.send-button,
+.suggestion,
+.icon-button {
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+.send-button:active:not(:disabled),
+.suggestion:active:not(:disabled),
+.icon-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.run-progress {
+  margin: 18px 0 22px 42px;
+}
+.run-progress .working-status {
+  margin: 0;
+}
+.run-elapsed {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: auto;
+}
+.run-patience {
+  margin: 8px 0 0 22px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.connection-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 12px 0;
+  font-size: 11px;
+  color: var(--secondary);
 }
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -1,3 +1,5 @@
+import { m } from "motion/react";
+import { backdropVariants, dialogVariants } from "./motion";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, FolderOpen, Loader2, X } from "lucide-react";
 import type { Settings } from "./types";
@@ -71,13 +73,18 @@ export default function WorkspaceDialog({
     }
   }
   return (
-    <div
+    <m.div
+      variants={backdropVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
       className="modal-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
+      <m.div
+        variants={dialogVariants}
         className="modal workspace-dialog"
         ref={dialog}
         role="dialog"
@@ -158,7 +165,7 @@ export default function WorkspaceDialog({
             {busy ? "Waiting for folder selection…" : "Choose folder"}
           </button>
         </div>
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   );
 }

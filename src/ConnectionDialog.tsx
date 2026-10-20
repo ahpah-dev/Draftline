@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { m } from "motion/react";
+import { backdropVariants, dialogVariants } from "./motion";
 import {
   Check,
   CheckCircle2,
@@ -272,13 +274,18 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
   }
 
   return (
-    <div
+    <m.div
+      variants={backdropVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
       className="modal-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
+      <m.div
+        variants={dialogVariants}
         className="modal conn-modal"
         role="dialog"
         aria-modal="true"
@@ -407,6 +414,24 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
           </button>
         </div>
 
+        {busy && (
+          <div className="connection-progress" role="status">
+            <span>
+              {busy === "diagnostics"
+                ? "Waiting for the local model. Loading can take a while."
+                : "Waiting for the local model server…"}
+            </span>
+            <button
+              className="button secondary"
+              onClick={() => {
+                controllerRef.current?.abort();
+                setBusy(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {connected && (
           <div className="conn-connected">
             <div className="field">
@@ -556,7 +581,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
             Save connection
           </button>
         </div>
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   );
 }

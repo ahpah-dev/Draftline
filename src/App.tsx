@@ -1,3 +1,6 @@
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
+import { enterMotion } from "./motion";
+import RunProgress from "./RunProgress";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -117,7 +120,7 @@ function Text({ content }: { content: string }) {
 }
 function ToolRow({ tool }: { tool: ToolEvent }) {
   return (
-    <details className="tool-row">
+    <m.details className="tool-row" {...enterMotion}>
       <summary>
         <span className={`tool-icon ${tool.state}`}>
           {tool.state === "completed" ? (
@@ -142,7 +145,7 @@ function ToolRow({ tool }: { tool: ToolEvent }) {
           ? `\n\n${typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2)}`
           : ""}
       </pre>
-    </details>
+    </m.details>
   );
 }
 
@@ -193,6 +196,9 @@ export default function App() {
   const textArea = useRef<HTMLTextAreaElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const messageEnd = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const followOutput = useRef(true);
+  const reducedMotion = useReducedMotion();
   const sidebarRef = useRef<HTMLElement>(null);
   const mainShellRef = useRef<HTMLDivElement>(null);
   const focusComposer = useRef(false);
@@ -213,10 +219,15 @@ export default function App() {
     () => save("codex-local:sidebar-collapsed:v1", sidebarCollapsed),
     [sidebarCollapsed],
   );
-  useEffect(
-    () => save("codex-local:threads:v1", threads.slice(0, 30)),
-    [threads],
-  );
+  useEffect(() => {
+    const persist = () => save("codex-local:threads:v1", threads.slice(0, 30));
+    const timer = setTimeout(persist, 250);
+    window.addEventListener("pagehide", persist);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pagehide", persist);
+    };
+  }, [threads]);
   useEffect(() => {
     if (!toast) return;
     const timeout = setTimeout(() => setToast(""), 2500);
@@ -292,8 +303,25 @@ export default function App() {
     };
   }, [mobileSidebar]);
   useEffect(() => {
-    messageEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [active?.messages.length, active?.tools.length, approval]);
+    followOutput.current = true;
+  }, [selected]);
+  useEffect(() => {
+    if (!followOutput.current) return;
+    const frame = requestAnimationFrame(() => {
+      const messages = messagesRef.current;
+      messages?.scrollTo({
+        top: messages.scrollHeight,
+        behavior: reducedMotion ? "instant" : "smooth",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    selected,
+    active?.messages.length,
+    active?.tools.length,
+    approval,
+    reducedMotion,
+  ]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
@@ -406,10 +434,7 @@ export default function App() {
       const nextSettings = { ...settings, runtimeUrl: parsed.origin };
       let current: Health;
       try {
-        current = await getHealth(
-          nextSettings,
-          AbortSignal.any([abort.signal, AbortSignal.timeout(5000)]),
-        );
+        current = await getHealth(nextSettings, abort.signal);
       } catch (error) {
         if (abort.signal.aborted) throw error;
         throw new Error(
@@ -511,6 +536,7 @@ export default function App() {
     setError("");
     setPrompt("");
     setBusy(true);
+    followOutput.current = true;
     setRunStatus("Starting task");
     setView("workspace");
     const threadId = selected && active ? selected : id();
@@ -788,13 +814,18 @@ export default function App() {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-      {mobileSidebar && (
-        <button
-          className="sidebar-scrim"
-          aria-label="Close sidebar"
-          onClick={() => setMobileSidebar(false)}
-        />
-      )}
+      <AnimatePresence>
+        {mobileSidebar && (
+          <m.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="sidebar-scrim"
+            aria-label="Close sidebar"
+            onClick={() => setMobileSidebar(false)}
+          />
+        )}
+      </AnimatePresence>
       <aside
         ref={sidebarRef}
         className={`sidebar ${mobileSidebar ? "is-open" : ""}`}
@@ -1042,7 +1073,7 @@ export default function App() {
         >
           <main className="main-content">
             {view === "workspace" && !active && (
-              <div className="home-view">
+              <m.div className="home-view" key="home" {...enterMotion}>
                 <div className="hero">
                   <div className="hero-kicker">
                     <Terminal size={16} />
@@ -1165,10 +1196,14 @@ export default function App() {
                     You review every file change and terminal command.
                   </span>
                 </div>
-              </div>
+              </m.div>
             )}
             {view === "workspace" && active && (
-              <div className="conversation-view">
+              <m.div
+                className="conversation-view"
+                key={selected || "conversation"}
+                {...enterMotion}
+              >
                 <div className="conversation-header">
                   <div>
                     <span className="eyebrow">
@@ -1191,9 +1226,20 @@ export default function App() {
                     <Copy size={16} />
                   </button>
                 </div>
-                <div className="conversation-messages" aria-live="polite">
+                <div
+                  className="conversation-messages"
+                  aria-live="polite"
+                  ref={messagesRef}
+                  onScroll={() => {
+                    const el = messagesRef.current;
+                    if (el)
+                      followOutput.current =
+                        el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+                  }}
+                >
                   {active.messages.map((message) => (
-                    <article
+                    <m.article
+                      {...enterMotion}
                       className={`message ${message.role}`}
                       key={message.id}
                     >
@@ -1207,7 +1253,7 @@ export default function App() {
                         </div>
                         <Text content={message.content} />
                       </div>
-                    </article>
+                    </m.article>
                   ))}
                   {active.tools.length > 0 && (
                     <div className="tools-block">
@@ -1273,12 +1319,9 @@ export default function App() {
                       </button>
                     </div>
                   )}
-                  {busy && (
-                    <div className="working-status">
-                      <Loader2 className="spin" size={14} />
-                      {runStatus}
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {busy && <RunProgress status={runStatus} />}
+                  </AnimatePresence>
                   <div ref={messageEnd} />
                 </div>
                 <div className="conversation-composer">
@@ -1289,10 +1332,10 @@ export default function App() {
                       : "Ask mode uses read-only tools."}
                   </p>
                 </div>
-              </div>
+              </m.div>
             )}
             {view === "activity" && (
-              <div className="secondary-view">
+              <m.div className="secondary-view" key="activity" {...enterMotion}>
                 <span className="eyebrow">Workspace</span>
                 <h1>Task history</h1>
                 <p className="view-subtitle">
@@ -1368,10 +1411,14 @@ export default function App() {
                     </button>
                   </div>
                 ))}
-              </div>
+              </m.div>
             )}
             {view === "guide" && (
-              <div className="secondary-view guide-view">
+              <m.div
+                className="secondary-view guide-view"
+                key="guide"
+                {...enterMotion}
+              >
                 <span className="eyebrow">Getting started</span>
                 <h1>Set up your workspace</h1>
                 <p className="view-subtitle">
@@ -1473,114 +1520,123 @@ export default function App() {
                   Compatibility depends on your model, template, and provider
                   version.
                 </p>
-              </div>
+              </m.div>
             )}
           </main>
-          {view === "workspace" && rightTab === "files" && (
-            <aside className="context-panel" aria-label="Workspace files">
-              <div className="context-tabs">
-                <div className="file-drawer-title">
-                  <FolderOpen size={17} />
-                  <strong>Workspace files</strong>
-                </div>
-                <div className="file-drawer-actions">
-                  <button
-                    className="icon-button"
-                    aria-label="Choose project folder"
-                    title="Open folder"
-                    onClick={() => void chooseWorkspace()}
-                    disabled={busy || pickingWorkspace}
-                  >
-                    {pickingWorkspace ? (
-                      <Loader2 size={17} className="spin" />
-                    ) : (
-                      <FolderOpen size={17} />
-                    )}
-                  </button>
-                  <button
-                    className="icon-button"
-                    aria-label="Close files panel"
-                    title="Close files"
-                    onClick={() => setRightTab("overview")}
-                  >
-                    <PanelRightClose size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="file-panel">
-                <div className="panel-section-heading">
-                  {health ? "WORKSPACE FILES" : "SAMPLE FILES"}
-                  <button
-                    className="icon-button"
-                    title="Go to root"
-                    aria-label="Go to root folder"
-                    onClick={() => {
-                      setFolder("");
-                      setOpenFile(null);
-                    }}
-                  >
-                    <FolderOpen size={14} />
-                  </button>
-                </div>
-                {folder && (
-                  <button
-                    className="folder-back"
-                    onClick={() =>
-                      setFolder(folder.split("/").slice(0, -1).join("/"))
-                    }
-                  >
-                    ← Parent directory
-                  </button>
-                )}
-                {fileLoading && (
-                  <p className="muted">
-                    <Loader2 size={14} className="spin" />
-                    Loading files…
-                  </p>
-                )}
-                {fileError && (
-                  <p className="error" role="alert">
-                    {fileError}
-                  </p>
-                )}
-                {files.map((entry) => (
-                  <button
-                    className={`file-entry ${openFile?.path === entry.path ? "active" : ""}`}
-                    key={entry.path}
-                    onClick={() => void openEntry(entry)}
-                  >
-                    {entry.type === "directory" ? (
-                      <Folder size={14} />
-                    ) : (
-                      <FileCode2 size={14} />
-                    )}
-                    <span>{entry.name}</span>
-                    {entry.type === "directory" && <ChevronRight size={12} />}
-                  </button>
-                ))}
-                {!health && (
-                  <p className="sample-notice">
-                    Illustrative project. Connect locally to browse your files.
-                  </p>
-                )}
-                {openFile && (
-                  <div className="file-preview">
-                    <div>
-                      <span>{openFile.path}</span>
-                      <button
-                        className="icon-button"
-                        aria-label="Close file preview"
-                        onClick={() => setOpenFile(null)}
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                    <pre>{openFile.content}</pre>
+          <AnimatePresence>
+            {view === "workspace" && rightTab === "files" && (
+              <m.aside
+                className="context-panel"
+                aria-label="Workspace files"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 24 }}
+              >
+                <div className="context-tabs">
+                  <div className="file-drawer-title">
+                    <FolderOpen size={17} />
+                    <strong>Workspace files</strong>
                   </div>
-                )}
-              </div>
-            </aside>
-          )}
+                  <div className="file-drawer-actions">
+                    <button
+                      className="icon-button"
+                      aria-label="Choose project folder"
+                      title="Open folder"
+                      onClick={() => void chooseWorkspace()}
+                      disabled={busy || pickingWorkspace}
+                    >
+                      {pickingWorkspace ? (
+                        <Loader2 size={17} className="spin" />
+                      ) : (
+                        <FolderOpen size={17} />
+                      )}
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label="Close files panel"
+                      title="Close files"
+                      onClick={() => setRightTab("overview")}
+                    >
+                      <PanelRightClose size={18} />
+                    </button>
+                  </div>
+                </div>
+                <div className="file-panel">
+                  <div className="panel-section-heading">
+                    {health ? "WORKSPACE FILES" : "SAMPLE FILES"}
+                    <button
+                      className="icon-button"
+                      title="Go to root"
+                      aria-label="Go to root folder"
+                      onClick={() => {
+                        setFolder("");
+                        setOpenFile(null);
+                      }}
+                    >
+                      <FolderOpen size={14} />
+                    </button>
+                  </div>
+                  {folder && (
+                    <button
+                      className="folder-back"
+                      onClick={() =>
+                        setFolder(folder.split("/").slice(0, -1).join("/"))
+                      }
+                    >
+                      ← Parent directory
+                    </button>
+                  )}
+                  {fileLoading && (
+                    <p className="muted">
+                      <Loader2 size={14} className="spin" />
+                      Loading files…
+                    </p>
+                  )}
+                  {fileError && (
+                    <p className="error" role="alert">
+                      {fileError}
+                    </p>
+                  )}
+                  {files.map((entry) => (
+                    <button
+                      className={`file-entry ${openFile?.path === entry.path ? "active" : ""}`}
+                      key={entry.path}
+                      onClick={() => void openEntry(entry)}
+                    >
+                      {entry.type === "directory" ? (
+                        <Folder size={14} />
+                      ) : (
+                        <FileCode2 size={14} />
+                      )}
+                      <span>{entry.name}</span>
+                      {entry.type === "directory" && <ChevronRight size={12} />}
+                    </button>
+                  ))}
+                  {!health && (
+                    <p className="sample-notice">
+                      Illustrative project. Connect locally to browse your
+                      files.
+                    </p>
+                  )}
+                  {openFile && (
+                    <div className="file-preview">
+                      <div>
+                        <span>{openFile.path}</span>
+                        <button
+                          className="icon-button"
+                          aria-label="Close file preview"
+                          onClick={() => setOpenFile(null)}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                      <pre>{openFile.content}</pre>
+                    </div>
+                  )}
+                </div>
+              </m.aside>
+            )}
+          </AnimatePresence>
         </div>
         <footer className="statusbar">
           <span className="runtime-indicator">
@@ -1595,44 +1651,55 @@ export default function App() {
           <span className="statusbar-shortcut">Ctrl ↵ to send</span>
         </footer>
       </div>
-      {showConnection && (
-        <ConnectionDialog
-          settings={settings}
-          onClose={() => setShowConnection(false)}
-          onSave={(next, h) => {
-            initialConnection.current?.abort();
-            if (health && health.workspace !== h.workspace) {
-              setSelected(null);
-              setPrompt("");
-              setFolder("");
-              setOpenFile(null);
-            }
-            setSettings(next);
-            setHealth(h);
-            setConnected(true);
-            setShowConnection(false);
-            setToast("Local model connected");
-          }}
-        />
-      )}
-      {showWorkspace && (
-        <WorkspaceDialog
-          settings={settings}
-          error={workspaceError}
-          busy={pickingWorkspace}
-          onClose={() => {
-            workspaceController.current?.abort();
-            setShowWorkspace(false);
-          }}
-          onRetry={(url) => void chooseWorkspace(url)}
-        />
-      )}
-      {toast && (
-        <div className="toast" role="status">
-          <Check size={14} />
-          {toast}
-        </div>
-      )}
+      <AnimatePresence>
+        {showConnection && (
+          <ConnectionDialog
+            key="connection"
+            settings={settings}
+            onClose={() => setShowConnection(false)}
+            onSave={(next, h) => {
+              initialConnection.current?.abort();
+              if (health && health.workspace !== h.workspace) {
+                setSelected(null);
+                setPrompt("");
+                setFolder("");
+                setOpenFile(null);
+              }
+              setSettings(next);
+              setHealth(h);
+              setConnected(true);
+              setShowConnection(false);
+              setToast("Local model connected");
+            }}
+          />
+        )}
+        {showWorkspace && (
+          <WorkspaceDialog
+            key="workspace"
+            settings={settings}
+            error={workspaceError}
+            busy={pickingWorkspace}
+            onClose={() => {
+              workspaceController.current?.abort();
+              setShowWorkspace(false);
+            }}
+            onRetry={(url) => void chooseWorkspace(url)}
+          />
+        )}
+        {toast && (
+          <m.div
+            key="toast"
+            className="toast"
+            role="status"
+            initial={{ opacity: 0, y: 10, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: 6, x: "-50%" }}
+          >
+            <Check size={14} />
+            {toast}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

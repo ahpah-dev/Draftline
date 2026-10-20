@@ -321,6 +321,41 @@ test("writes require an individual approval even when approved:true is supplied 
   assert.equal(events.at(-1).data.state, "completed");
 });
 
+test("approval remains pending beyond ten minutes and still requires a decision", async (t) => {
+  let count = 0;
+  const f = await fixture(t, "ollama", () =>
+    count++ === 0
+      ? {
+          content: "",
+          tool_calls: [
+            {
+              function: {
+                name: "write_file",
+                arguments: { path: "waiting.txt", content: "approved later" },
+              },
+            },
+          ],
+        }
+      : { content: "Saved after approval." },
+  );
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const events = await run(f, { mode: "agent" }, async (event) => {
+    if (event.type !== "approval") return;
+    t.mock.timers.tick(600_001);
+    await assert.rejects(fs.readFile(path.join(f.root, "waiting.txt")));
+    const approved = await f.api(`/api/approvals/${event.data.id}`, {
+      method: "POST",
+      body: '{"approved":true}',
+    });
+    assert.equal(approved.status, 200);
+  });
+  assert.equal(events.at(-1).data.state, "completed");
+  assert.equal(
+    await fs.readFile(path.join(f.root, "waiting.txt"), "utf8"),
+    "approved later",
+  );
+});
+
 test("denied write is reported to the model and leaves the workspace unchanged", async (t) => {
   let count = 0;
   const f = await fixture(t, "llamacpp", (input) => {

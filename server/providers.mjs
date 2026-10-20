@@ -1,3 +1,5 @@
+import { providerRequest as request } from "./transport.mjs";
+
 export function providerConfig(input) {
   if (!input || !["ollama", "llamacpp"].includes(input.provider))
     throw new Error("Provider must be ollama or llamacpp.");
@@ -35,46 +37,10 @@ export function providerConfig(input) {
   };
 }
 
-async function request(url, { signal, timeout = 120_000, ...options } = {}) {
-  const timeoutSignal = AbortSignal.timeout(timeout);
-  let response;
-  try {
-    response = await fetch(url, {
-      ...options,
-      redirect: "error",
-      signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
-    });
-  } catch (error) {
-    if (signal?.aborted) throw new Error("Run cancelled.");
-    if (timeoutSignal.aborted)
-      throw new Error(
-        `Provider request timed out after ${timeout / 1000} seconds.`,
-      );
-    throw new Error(`Cannot reach local provider: ${error.message}`);
-  }
-  const body = await response.text();
-  if (body.length > 5_000_000)
-    throw new Error("Provider response exceeds the 5 MB limit.");
-  let data;
-  try {
-    data = JSON.parse(body);
-  } catch {
-    throw new Error(
-      `Provider returned invalid JSON (HTTP ${response.status}).`,
-    );
-  }
-  if (!response.ok || data.error)
-    throw new Error(
-      `Provider error (${response.status}): ${typeof data.error === "string" ? data.error : data.error?.message || body.slice(0, 400)}`,
-    );
-  return data;
-}
-
 export async function models(config, signal) {
   const endpoint = config.provider === "ollama" ? "/api/tags" : "/v1/models";
   const result = await request(config.baseUrl + endpoint, {
     signal,
-    timeout: 15_000,
   });
   const list =
     config.provider === "ollama"

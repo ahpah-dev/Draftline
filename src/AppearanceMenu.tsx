@@ -1,3 +1,5 @@
+import { AnimatePresence, m } from "motion/react";
+import { menuMotion } from "./motion";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Check, Monitor, Moon, Sun } from "lucide-react";
 
@@ -137,41 +139,44 @@ export default function AppearanceMenu() {
       >
         <CurrentIcon size={17} aria-hidden="true" />
       </button>
-      {open && (
-        <div
-          className="appearance-menu"
-          id={menuId}
-          role="menu"
-          aria-label="Appearance"
-          onKeyDown={navigateMenu}
-        >
-          <div className="appearance-menu-label" aria-hidden="true">
-            Appearance
-          </div>
-          {options.map(({ value, label, Icon }, index) => (
-            <button
-              className={`appearance-option${value === appearance ? " active" : ""}`}
-              type="button"
-              key={value}
-              ref={(element) => {
-                optionRefs.current[index] = element;
-              }}
-              role="menuitemradio"
-              aria-checked={value === appearance}
-              tabIndex={-1}
-              onClick={() => {
-                setAppearance(value);
-                setOpen(false);
-                triggerRef.current?.focus();
-              }}
-            >
-              <Icon size={16} aria-hidden="true" />
-              <span>{label}</span>
-              {value === appearance && <Check size={15} aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <m.div
+            {...menuMotion}
+            className="appearance-menu"
+            id={menuId}
+            role="menu"
+            aria-label="Appearance"
+            onKeyDown={navigateMenu}
+          >
+            <div className="appearance-menu-label" aria-hidden="true">
+              Appearance
+            </div>
+            {options.map(({ value, label, Icon }, index) => (
+              <button
+                className={`appearance-option${value === appearance ? " active" : ""}`}
+                type="button"
+                key={value}
+                ref={(element) => {
+                  optionRefs.current[index] = element;
+                }}
+                role="menuitemradio"
+                aria-checked={value === appearance}
+                tabIndex={-1}
+                onClick={() => {
+                  setAppearance(value);
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{label}</span>
+                {value === appearance && <Check size={15} aria-hidden="true" />}
+              </button>
+            ))}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
