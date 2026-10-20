@@ -47,21 +47,21 @@ export const initialThreads: Thread[] = [
 export const suggestions = [
   {
     kind: "Explore",
-    title: "Get to know a codebase",
+    title: "Explore a codebase",
     description: "Find the architecture. See the big picture.",
     prompt:
       "Explore this project. Explain its architecture, entry points, and how to run it.",
   },
   {
     kind: "Build",
-    title: "Make your next feature",
+    title: "Build a feature",
     description: "Turn a good idea into working code.",
     prompt:
       "Help me plan a new feature for this project. First explore the code and ask me what I want to build.",
   },
   {
     kind: "Improve",
-    title: "Find a small, useful fix",
+    title: "Review code",
     description: "Spot a bug. Make things a little better.",
     prompt:
       "Review this project for a small, useful improvement. Explain the proposed fix before changing files.",

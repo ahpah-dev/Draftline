@@ -3,12 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f8f8f5" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      try {
+        var appearance = localStorage.getItem("codex-local:appearance:v1");
+        document.documentElement.dataset.theme =
+          appearance === "dark" ||
+          (appearance === "system" &&
+            matchMedia("(prefers-color-scheme: dark)").matches)
+            ? "dark"
+            : "light";
+      } catch {}
+    </script>
     <meta
       name="description"
-      content="Your models. Your machine. A professional local coding workspace for Ollama and llama.cpp, with native tools and approval controls."
+      content="A local coding workspace for Ollama and llama.cpp models, with chat, file tools, terminal access, and approval controls."
     />
-    <title>Codex Local — Your ideas, on your machine.</title>
+    <title>Codex Local — Local coding workspace</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   </head>
   <body>

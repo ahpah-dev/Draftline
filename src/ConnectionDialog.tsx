@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowRight,
   Check,
   CheckCircle2,
   Copy,
@@ -80,7 +79,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
       if (event.key !== "Tab") return;
       const elements = Array.from(
         modalRef.current?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex="0"]',
         ) || [],
       ).filter((element) => element.getClientRects().length > 0);
       const first = elements[0];
@@ -285,26 +284,28 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
         aria-modal="true"
         aria-labelledby="connection-title"
         aria-describedby="connection-description"
+        aria-busy={!!busy}
         ref={modalRef}
         tabIndex={-1}
       >
         <div className="modal-head">
           <div>
-            <div className="eyebrow">YOUR MACHINE. YOUR MODELS.</div>
-            <h2 id="connection-title">Connect a local model</h2>
+            <div className="eyebrow">Settings</div>
+            <h2 id="connection-title">Model connection</h2>
           </div>
           <button
             className="icon-button"
             type="button"
             aria-label="Close connection settings"
+            title="Close settings"
             onClick={onClose}
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
         <p className="muted" id="connection-description">
-          A small local runtime gives your model access to your project,
-          terminal, and coding tools.
+          Connect your model server and local runtime to work with a project on
+          your computer.
         </p>
 
         <div
@@ -320,7 +321,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
             onClick={() => changeProvider("ollama")}
           >
             <span>Ollama</span>
-            <small>Local model library</small>
+            <small>Installed models</small>
           </button>
           <button
             type="button"
@@ -330,7 +331,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
             onClick={() => changeProvider("llamacpp")}
           >
             <span>llama.cpp</span>
-            <small>OpenAI-compatible server</small>
+            <small>Local inference server</small>
           </button>
         </div>
 
@@ -344,11 +345,17 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
               type="url"
               spellCheck={false}
               autoComplete="off"
+              aria-describedby="provider-url-help"
               value={form.baseUrl}
               onChange={(event) => update("baseUrl", event.target.value)}
               disabled={!!busy}
               ref={inputRef}
             />
+            <p className="muted conn-field-help" id="provider-url-help">
+              {form.provider === "ollama"
+                ? "The address where Ollama is running."
+                : "The address where llama-server is running."}
+            </p>
           </div>
           <div className="field">
             <label htmlFor="runtime-url">Local runtime URL</label>
@@ -357,18 +364,29 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
               type="url"
               spellCheck={false}
               autoComplete="off"
+              aria-describedby="runtime-url-help"
               value={form.runtimeUrl}
               onChange={(event) => update("runtimeUrl", event.target.value)}
               disabled={!!busy}
             />
+            <p className="muted conn-field-help" id="runtime-url-help">
+              Runs file and terminal tools in your project.
+            </p>
           </div>
         </div>
         <div className="conn-connect-row">
-          <span className="muted conn-connect-note">
-            <span className={`status-dot${connected ? " connected" : ""}`} />
+          <span
+            className="muted conn-connect-note"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className={`status-dot${connected ? " connected" : ""}`}
+              aria-hidden="true"
+            />
             {connected
-              ? "Model server connected"
-              : "Waiting for a local connection"}
+              ? `${models.length} ${models.length === 1 ? "model" : "models"} available`
+              : "Not connected"}
           </span>
           <button
             className="button secondary"
@@ -377,9 +395,9 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
             disabled={!!busy}
           >
             {busy === "connect" ? (
-              <LoaderCircle size={15} className="spin" />
+              <LoaderCircle size={15} className="spin" aria-hidden="true" />
             ) : (
-              <Plug size={15} />
+              <Plug size={15} aria-hidden="true" />
             )}
             {busy === "connect"
               ? "Connecting…"
@@ -392,7 +410,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
         {connected && (
           <div className="conn-connected">
             <div className="field">
-              <label htmlFor="connection-model">Model</label>
+              <label htmlFor="connection-model">Active model</label>
               <select
                 id="connection-model"
                 value={form.model}
@@ -407,13 +425,13 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
               </select>
             </div>
             <p className="muted conn-workspace">
-              Workspace <code>{connected.workspace}</code>
+              Project <code>{connected.workspace}</code>
             </p>
             <div className="conn-diagnostic-action">
               <div>
-                <strong>Check tool compatibility</strong>
+                <strong>Tool compatibility</strong>
                 <p className="muted">
-                  Test the selected model’s tool calls before starting a run.
+                  Verify that this model can use the coding tools.
                 </p>
               </div>
               <button
@@ -423,9 +441,9 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
                 disabled={!!busy || !form.model}
               >
                 {busy === "diagnostics" ? (
-                  <LoaderCircle size={15} className="spin" />
+                  <LoaderCircle size={15} className="spin" aria-hidden="true" />
                 ) : (
-                  <ShieldCheck size={15} />
+                  <ShieldCheck size={15} aria-hidden="true" />
                 )}
                 {busy === "diagnostics" ? "Testing…" : "Run check"}
               </button>
@@ -448,9 +466,9 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
                 {diagnostics.checks.map((check, index) => (
                   <li key={`${check.name}-${index}`}>
                     {check.ok ? (
-                      <CheckCircle2 size={16} />
+                      <CheckCircle2 size={16} aria-hidden="true" />
                     ) : (
-                      <XCircle size={16} />
+                      <XCircle size={16} aria-hidden="true" />
                     )}
                     <div>
                       <span>{check.name}</span>
@@ -469,15 +487,15 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
         )}
         {error && (
           <div className="error conn-error" role="alert">
-            <XCircle size={16} />
+            <XCircle size={16} aria-hidden="true" />
             <span>{error}</span>
           </div>
         )}
 
-        <details className="conn-setup" open={!connected}>
+        <details className="conn-setup">
           <summary>
-            <Terminal size={16} />
-            <span>Start the local runtime</span>
+            <Terminal size={16} aria-hidden="true" />
+            <span>Set up the local runtime</span>
           </summary>
           <p className="muted">
             Install Node.js 22 or later. Run these commands in your terminal and
@@ -494,8 +512,13 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
               aria-label={
                 copied ? "Setup commands copied" : "Copy setup commands"
               }
+              title={copied ? "Copied" : "Copy commands"}
             >
-              {copied ? <Check size={15} /> : <Copy size={15} />}
+              {copied ? (
+                <Check size={15} aria-hidden="true" />
+              ) : (
+                <Copy size={15} aria-hidden="true" />
+              )}
             </button>
           </div>
           <p className="muted">
@@ -517,8 +540,10 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
         <div className="conn-footer">
           <span className="muted">
             {diagnostics?.ok
-              ? "Selected model passed the tool check."
-              : "Compatibility depends on the selected model."}
+              ? "Tool compatibility verified."
+              : connected
+                ? "Run a tool check before your first task."
+                : "Connect to choose a model."}
           </span>
           <button
             className="button primary"
@@ -528,8 +553,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
               if (connected) onSave(checkedSettings(), connected, models);
             }}
           >
-            Use this connection
-            <ArrowRight size={16} />
+            Save connection
           </button>
         </div>
       </div>

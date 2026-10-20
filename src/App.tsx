@@ -8,27 +8,32 @@ import {
   CircleHelp,
   Code2,
   Copy,
+  Cpu,
   FileCode2,
   Folder,
   FolderOpen,
-  GitBranch,
   Github,
   History,
-  Laptop,
   Loader2,
   Menu,
   MessageSquare,
   Plus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Search,
   Settings2,
   ShieldCheck,
-  Sparkles,
+  SquarePen,
   Square,
   Terminal,
   X,
   Zap,
 } from "lucide-react";
 import ConnectionDialog from "./ConnectionDialog";
+import AppearanceMenu from "./AppearanceMenu";
+import ModeMenu from "./ModeMenu";
 import { health as getHealth, request, streamRun } from "./api";
 import { exampleFiles, initialThreads, suggestions } from "./demo";
 import type {
@@ -164,6 +169,9 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    stored("codex-local:sidebar-collapsed:v1", false),
+  );
   const [rightTab, setRightTab] = useState<"overview" | "files">("overview");
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [folder, setFolder] = useState("");
@@ -181,6 +189,9 @@ export default function App() {
   const textArea = useRef<HTMLTextAreaElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const messageEnd = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const mainShellRef = useRef<HTMLDivElement>(null);
+  const focusComposer = useRef(false);
   const active = threads.find((t) => t.id === selected);
   const workspace =
     health?.workspace?.split(/[\\/]/).filter(Boolean).at(-1) || "my-next-idea";
@@ -193,6 +204,10 @@ export default function App() {
 
   useEffect(() => save("codex-local:settings:v1", settings), [settings]);
   useEffect(
+    () => save("codex-local:sidebar-collapsed:v1", sidebarCollapsed),
+    [sidebarCollapsed],
+  );
+  useEffect(
     () => save("codex-local:threads:v1", threads.slice(0, 30)),
     [threads],
   );
@@ -202,16 +217,86 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [toast]);
   useEffect(() => {
-    if (showSearch) searchInput.current?.focus();
+    if (!showSearch) return;
+    const frame = requestAnimationFrame(() => searchInput.current?.focus());
+    return () => cancelAnimationFrame(frame);
   }, [showSearch]);
+  useEffect(() => {
+    if (
+      focusComposer.current &&
+      !selected &&
+      view === "workspace" &&
+      !mobileSidebar
+    ) {
+      textArea.current?.focus();
+      focusComposer.current = false;
+    }
+  }, [selected, view, mobileSidebar]);
+  useEffect(() => {
+    if (!mobileSidebar || !window.matchMedia("(max-width: 640px)").matches)
+      return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const sidebar = sidebarRef.current;
+    if (mainShellRef.current) mainShellRef.current.inert = true;
+    const focusFrame = requestAnimationFrame(() => {
+      (showSearch
+        ? searchInput.current
+        : sidebar?.querySelector<HTMLElement>("a[href], button:not([disabled])")
+      )?.focus();
+    });
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const controls = Array.from(
+        sidebar?.querySelectorAll<HTMLElement>(
+          "a[href],button:not([disabled]),input:not([disabled])",
+        ) || [],
+      ).filter(
+        (element) =>
+          element.getClientRects().length &&
+          getComputedStyle(element).visibility !== "hidden",
+      );
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!sidebar?.contains(document.activeElement)) {
+        event.preventDefault();
+        first?.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", trap);
+    const media = window.matchMedia("(max-width: 640px)");
+    const handleResize = () => {
+      if (!media.matches) setMobileSidebar(false);
+    };
+    media.addEventListener("change", handleResize);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      media.removeEventListener("change", handleResize);
+      document.removeEventListener("keydown", trap);
+      if (mainShellRef.current) mainShellRef.current.inert = false;
+      previousFocus?.focus();
+    };
+  }, [mobileSidebar]);
   useEffect(() => {
     messageEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [active?.messages.length, active?.tools.length, approval]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        if ((event.target as HTMLElement)?.closest?.(".modal")) return;
         event.preventDefault();
         setShowSearch((v) => !v);
+        setSidebarCollapsed(false);
+        if (window.matchMedia("(max-width: 640px)").matches)
+          setMobileSidebar(true);
       }
       if (event.key === "Escape") setMobileSidebar(false);
     };
@@ -284,10 +369,12 @@ export default function App() {
       return;
     }
     initialConnection.current?.abort();
+    setMobileSidebar(false);
     setShowConnection(true);
   }
   function newTask() {
     if (busy) return;
+    focusComposer.current = true;
     setSelected(null);
     setView("workspace");
     setPrompt("");
@@ -555,7 +642,7 @@ export default function App() {
         placeholder={
           active
             ? "Keep the conversation going…"
-            : "Ask anything, or describe what you want to build…"
+            : "Describe a task, ask a question, or start building…"
         }
         value={prompt}
         disabled={busy}
@@ -571,19 +658,16 @@ export default function App() {
         <div className="composer-controls">
           <button
             type="button"
-            className="mode-button"
-            onClick={() => setMode((m) => (m === "agent" ? "ask" : "agent"))}
-            disabled={busy}
-            title="Agent can propose file changes and commands. Ask uses read-only tools."
+            className="context-button icon-button"
+            aria-label="Browse workspace files"
+            title="Browse workspace files"
+            onClick={() =>
+              setRightTab((tab) => (tab === "files" ? "overview" : "files"))
+            }
           >
-            {mode === "agent" ? (
-              <Terminal size={14} />
-            ) : (
-              <MessageSquare size={14} />
-            )}{" "}
-            {mode === "agent" ? "Agent" : "Ask"}
-            <ChevronDown size={12} />
+            <Plus size={21} />
           </button>
+          <ModeMenu mode={mode} onChange={setMode} disabled={busy} />
           <span className="composer-divider" />
           <button
             type="button"
@@ -591,7 +675,7 @@ export default function App() {
             onClick={() => openConnection()}
             disabled={busy}
           >
-            {connected ? settings.model : "Select a local model"}
+            <span>{connected ? settings.model : "Choose model"}</span>
             <ChevronDown size={12} />
           </button>
         </div>
@@ -618,7 +702,7 @@ export default function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       {mobileSidebar && (
         <button
           className="sidebar-scrim"
@@ -626,34 +710,66 @@ export default function App() {
           onClick={() => setMobileSidebar(false)}
         />
       )}
-      <aside className={`sidebar ${mobileSidebar ? "is-open" : ""}`}>
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            newTask();
-          }}
-        >
-          <span className="brand-mark">
-            <Terminal size={21} strokeWidth={2} />
-          </span>
-          <span>
-            Codex<span className="brand-local">local</span>
-          </span>
-        </a>
+      <aside
+        ref={sidebarRef}
+        className={`sidebar ${mobileSidebar ? "is-open" : ""}`}
+        role={mobileSidebar ? "dialog" : undefined}
+        aria-modal={mobileSidebar ? true : undefined}
+        aria-label="Task navigation"
+      >
+        <div className="sidebar-top">
+          <a
+            className="brand"
+            aria-label="Codex Local home"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              newTask();
+            }}
+          >
+            <span className="brand-mark">
+              <Terminal size={22} strokeWidth={1.8} />
+            </span>
+            <span>
+              Codex<span className="brand-local">Local</span>
+            </span>
+          </a>
+          <button
+            className="icon-button sidebar-toggle"
+            aria-label={
+              sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+            }
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setSidebarCollapsed((v) => !v)}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen size={19} />
+            ) : (
+              <PanelLeftClose size={19} />
+            )}
+          </button>
+        </div>
         <div className="sidebar-actions">
-          <button className="new-task" onClick={newTask} disabled={busy}>
-            <Plus size={16} />
-            New task
+          <button
+            className="new-task"
+            aria-label="New task"
+            onClick={newTask}
+            disabled={busy}
+          >
+            <SquarePen size={19} />
+            <span>New task</span>
           </button>
           <button
             className={`search-button ${showSearch ? "active" : ""}`}
-            onClick={() => setShowSearch((v) => !v)}
+            aria-label="Search tasks"
+            onClick={() => {
+              setShowSearch((v) => !v);
+              setSidebarCollapsed(false);
+            }}
           >
             <Search size={16} />
             <span>Search tasks</span>
-            <kbd>⌘ K</kbd>
+            <kbd>Ctrl K</kbd>
           </button>
           {showSearch && (
             <input
@@ -703,7 +819,7 @@ export default function App() {
           </button>
         </nav>
         <div className="thread-heading">
-          <span>YOUR TASKS</span>
+          <span>Recent tasks</span>
           <button
             className="icon-button"
             aria-label="New task"
@@ -738,16 +854,9 @@ export default function App() {
           )}
         </div>
         <div className="sidebar-bottom">
-          <div className="local-note">
-            <span className="green-spark">
-              <Sparkles size={15} />
-            </span>
-            <div>
-              Your code stays yours.<span>Local models. Full control.</span>
-            </div>
-          </div>
           <button
             className="workspace-switch"
+            aria-label={`Model connection for ${workspace}`}
             onClick={() => openConnection()}
             disabled={busy}
           >
@@ -757,14 +866,14 @@ export default function App() {
             <span>
               {workspace}
               <small>
-                {connected ? "Local runtime connected" : "Demo workspace"}
+                {connected ? "Local workspace" : "Connect your workspace"}
               </small>
             </span>
             <Settings2 size={15} />
           </button>
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" ref={mainShellRef}>
         <header className="topbar">
           <div className="breadcrumbs">
             <button
@@ -774,33 +883,50 @@ export default function App() {
             >
               <Menu size={19} />
             </button>
-            <FolderOpen size={15} />
-            <span>{workspace}</span>
-            <span className="slash">/</span>
-            <strong>
+            <button
+              className="product-switch"
+              onClick={openConnection}
+              disabled={busy}
+            >
+              Codex Local <ChevronDown size={15} />
+            </button>
+            <span className="view-label">
               {view === "activity"
                 ? "Activity"
                 : view === "guide"
                   ? "Getting started"
                   : active
                     ? "Task"
-                    : "Workspace"}
-            </strong>
-            <span className="branch">
-              <GitBranch size={12} />
-              main
+                    : ""}
             </span>
           </div>
           <div className="topbar-actions">
+            {!connected && <span className="preview-badge">Preview</span>}
+            <AppearanceMenu />
+            <button
+              className={`icon-button files-toggle ${rightTab === "files" ? "active" : ""}`}
+              aria-label={rightTab === "files" ? "Close files" : "Open files"}
+              title="Workspace files"
+              onClick={() => {
+                setView("workspace");
+                setRightTab((tab) => (tab === "files" ? "overview" : "files"));
+              }}
+            >
+              {rightTab === "files" ? (
+                <PanelRightClose size={19} />
+              ) : (
+                <PanelRightOpen size={19} />
+              )}
+            </button>
             <a
               className="github-link"
               href={repo}
               target="_blank"
               rel="noreferrer"
+              aria-label="View source on GitHub"
+              title="View source on GitHub"
             >
-              <Github size={15} />
-              <span>GitHub</span>
-              <ArrowUp className="external-arrow" size={12} />
+              <Github size={18} />
             </a>
             <span className="topbar-separator" />
             <button
@@ -809,27 +935,10 @@ export default function App() {
               disabled={busy}
             >
               <span className="status-dot" />
-              {connected ? "Local connected" : "Connect runtime"}
-              <ChevronDown size={12} />
+              {connected ? "Connected" : "Connect model"}
             </button>
           </div>
         </header>
-        {!connected && (
-          <div className="demo-banner">
-            <span>
-              <Laptop size={14} />
-              <strong>A little preview of what’s possible.</strong>
-              <span className="banner-extra">
-                {" "}
-                Connect a local model to work on your code.
-              </span>
-            </span>
-            <button onClick={() => openConnection()}>
-              Set up locally
-              <ArrowRight size={13} />
-            </button>
-          </div>
-        )}
         <div
           className={`workspace-layout ${view !== "workspace" ? "full-width" : ""}`}
         >
@@ -837,30 +946,14 @@ export default function App() {
             {view === "workspace" && !active && (
               <div className="home-view">
                 <div className="hero">
-                  <div className="hero-label">
-                    <span className="status-dot" />
-                    LOCAL BY DESIGN
+                  <div className="hero-kicker">
+                    <Terminal size={16} />
+                    <span>Your local coding workspace</span>
                   </div>
-                  <div className="hero-logo">
-                    <Terminal size={33} strokeWidth={1.6} />
-                  </div>
-                  <h1>
-                    Big ideas.
-                    <br />
-                    <span>Your machine.</span>
-                  </h1>
-                  <p>
-                    A quiet place to do your best work.
-                    <br className="mobile-only" /> Bring your model. Build
-                    something great.
-                  </p>
+                  <h1>What do you want to build?</h1>
+                  <p>Plan, write, and improve code with your local models.</p>
                 </div>
                 {composer}
-                <div className="composer-caption">
-                  <ShieldCheck size={12} />
-                  Your model runs locally. You approve changes.
-                  <span>⌘ ↵ to send</span>
-                </div>
                 <div className="suggestions">
                   {suggestions.map((s, i) => (
                     <button
@@ -872,7 +965,7 @@ export default function App() {
                         textArea.current?.focus();
                       }}
                     >
-                      <span className={`suggestion-icon icon-${i}`}>
+                      <span className="suggestion-icon">
                         {i === 0 ? (
                           <Search size={18} />
                         ) : i === 1 ? (
@@ -881,56 +974,77 @@ export default function App() {
                           <Zap size={18} />
                         )}
                       </span>
-                      <span className="suggestion-kind">{s.kind}</span>
                       <strong>{s.title}</strong>
-                      <span className="suggestion-description">
-                        {s.description}
-                      </span>
-                      <ArrowRight size={14} className="suggestion-arrow" />
                     </button>
                   ))}
                 </div>
-                <div className="recent-section">
-                  <div className="section-title">
-                    <h2>Pick up where you left off</h2>
-                    <button onClick={() => setView("activity")}>
-                      View all
-                      <ArrowRight size={12} />
-                    </button>
+                <button
+                  className="runtime-card"
+                  onClick={openConnection}
+                  disabled={busy}
+                >
+                  <span className="runtime-card-icon">
+                    <Cpu size={22} />
+                  </span>
+                  <span className="runtime-card-copy">
+                    <strong>
+                      {connected ? settings.model : "Connect your local model"}
+                    </strong>
+                    <span>
+                      {connected
+                        ? `${settings.provider === "ollama" ? "Ollama" : "llama.cpp"} · ${workspace}`
+                        : "Use Ollama or llama.cpp. Your code stays on your machine."}
+                    </span>
+                  </span>
+                  <span className="runtime-card-action">
+                    {connected ? "Manage" : "Set up"}
+                    <ArrowRight size={15} />
+                  </span>
+                </button>
+                {threads.some((t) => !t.demo) && (
+                  <div className="recent-section">
+                    <div className="section-title">
+                      <h2>Recent tasks</h2>
+                      <button onClick={() => setView("activity")}>
+                        View all
+                        <ArrowRight size={12} />
+                      </button>
+                    </div>
+                    {threads
+                      .filter((t) => !t.demo)
+                      .slice(0, 3)
+                      .map((t) => (
+                        <button
+                          className="recent-task"
+                          key={t.id}
+                          onClick={() => {
+                            if (!busy) setSelected(t.id);
+                          }}
+                          disabled={busy}
+                        >
+                          <span className="recent-icon">
+                            <MessageSquare size={16} />
+                          </span>
+                          <span>
+                            <strong>{t.title}</strong>
+                            <small>
+                              {t.demo
+                                ? "Sample task · explore the experience"
+                                : `${t.messages.filter((m) => m.role === "user").length} messages · ${t.tools.length} tool calls`}
+                            </small>
+                          </span>
+                          <span className="recent-time">
+                            {formatTime(t.updated)}
+                          </span>
+                          <ChevronRight size={14} />
+                        </button>
+                      ))}
                   </div>
-                  {threads.slice(0, 3).map((t) => (
-                    <button
-                      className="recent-task"
-                      key={t.id}
-                      onClick={() => {
-                        if (!busy) setSelected(t.id);
-                      }}
-                      disabled={busy}
-                    >
-                      <span className="recent-icon">
-                        <MessageSquare size={16} />
-                      </span>
-                      <span>
-                        <strong>{t.title}</strong>
-                        <small>
-                          {t.demo
-                            ? "Sample task · explore the experience"
-                            : `${t.messages.filter((m) => m.role === "user").length} messages · ${t.tools.length} tool calls`}
-                        </small>
-                      </span>
-                      <span className="recent-time">
-                        {formatTime(t.updated)}
-                      </span>
-                      <ChevronRight size={14} />
-                    </button>
-                  ))}
-                </div>
+                )}
                 <div className="home-footer">
-                  <span>Built for the way you think.</span>
-                  <span className="footer-providers">
-                    <span className="ollama-mini">♧</span> Ollama
-                    <span className="footer-dot">·</span>
-                    <Terminal size={13} /> llama.cpp
+                  <ShieldCheck size={13} />
+                  <span>
+                    You review every file change and terminal command.
                   </span>
                 </div>
               </div>
@@ -1061,14 +1175,10 @@ export default function App() {
             )}
             {view === "activity" && (
               <div className="secondary-view">
-                <span className="eyebrow">YOUR WORK, AT A GLANCE</span>
-                <h1>
-                  A little progress,
-                  <br />
-                  every day.
-                </h1>
+                <span className="eyebrow">Workspace</span>
+                <h1>Task history</h1>
                 <p className="view-subtitle">
-                  Everything you’ve been exploring, building, and improving.
+                  Your conversations and tool activity, saved on this device.
                 </p>
                 <div className="activity-stats">
                   <div>
@@ -1144,14 +1254,10 @@ export default function App() {
             )}
             {view === "guide" && (
               <div className="secondary-view guide-view">
-                <span className="eyebrow">LESS SETUP. MORE BUILDING.</span>
-                <h1>
-                  Make yourself
-                  <br />
-                  at home.
-                </h1>
+                <span className="eyebrow">Getting started</span>
+                <h1>Set up your workspace</h1>
                 <p className="view-subtitle">
-                  Your favorite models. Your own code. One focused workspace.
+                  Connect a local model and give it a project to work on.
                 </p>
                 <div className="guide-step">
                   <span className="step-number">01</span>
@@ -1252,225 +1358,108 @@ export default function App() {
               </div>
             )}
           </main>
-          {view === "workspace" && (
-            <aside className="context-panel">
+          {view === "workspace" && rightTab === "files" && (
+            <aside className="context-panel" aria-label="Workspace files">
               <div className="context-tabs">
-                <button
-                  className={rightTab === "overview" ? "active" : ""}
-                  onClick={() => setRightTab("overview")}
-                >
-                  Overview
-                </button>
-                <button
-                  className={rightTab === "files" ? "active" : ""}
-                  onClick={() => setRightTab("files")}
-                >
-                  Files
-                </button>
+                <div className="file-drawer-title">
+                  <FolderOpen size={17} />
+                  <strong>Workspace files</strong>
+                </div>
                 <button
                   className="icon-button"
-                  aria-label="Connection settings"
-                  onClick={() => openConnection()}
+                  aria-label="Close files panel"
+                  title="Close files"
+                  onClick={() => setRightTab("overview")}
                 >
-                  <Settings2 size={14} />
+                  <PanelRightClose size={18} />
                 </button>
               </div>
-              {rightTab === "overview" ? (
-                <>
-                  <div className="context-section">
-                    <div className="panel-section-heading">
-                      ENVIRONMENT
-                      <span className={`pill ${connected ? "live" : ""}`}>
-                        {connected ? "Connected" : "Preview"}
-                      </span>
-                    </div>
-                    <div className="environment-name">
-                      <span className="environment-icon">
-                        <Laptop size={20} />
-                      </span>
-                      <div>
-                        <strong>Local workspace</strong>
-                        <span>
-                          {connected ? workspace : "Ready when you are"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="environment-detail">
-                      <span>Runtime</span>
-                      <strong>
-                        {connected ? "Node.js local bridge" : "Not connected"}
-                      </strong>
-                    </div>
-                    <div className="environment-detail">
-                      <span>Provider</span>
-                      <strong>
-                        {connected
-                          ? settings.provider === "ollama"
-                            ? "Ollama"
-                            : "llama.cpp"
-                          : "Ollama / llama.cpp"}
-                      </strong>
-                    </div>
-                    <div className="environment-detail">
-                      <span>Model</span>
-                      <strong className="truncate">
-                        {connected ? settings.model : "Your choice"}
-                      </strong>
-                    </div>
-                    <button
-                      className="configure-button"
-                      onClick={() => openConnection()}
-                    >
-                      {connected
-                        ? "Manage connection"
-                        : "Connect a local model"}
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                  <div className="context-section">
-                    <div className="panel-section-heading">
-                      MADE FOR REAL WORK
-                    </div>
-                    <div className="capability">
-                      <span>
-                        <Folder size={15} />
-                      </span>
-                      <div>
-                        <strong>Understand your code</strong>
-                        <p>Read, search, and explore files.</p>
-                      </div>
-                    </div>
-                    <div className="capability">
-                      <span>
-                        <Code2 size={15} />
-                      </span>
-                      <div>
-                        <strong>Make thoughtful changes</strong>
-                        <p>Review each edit before it runs.</p>
-                      </div>
-                    </div>
-                    <div className="capability">
-                      <span>
-                        <Terminal size={15} />
-                      </span>
-                      <div>
-                        <strong>Close the loop</strong>
-                        <p>Approve commands. See results.</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="context-section compatibility">
-                    <span className="compatibility-icon">
-                      <ShieldCheck size={18} />
-                    </span>
-                    <h3>
-                      A good connection
-                      <br />
-                      goes a long way.
-                    </h3>
-                    <p>
-                      Test native tool calling with your model before putting it
-                      to work.
-                    </p>
-                    <button onClick={() => openConnection()}>
-                      Run a compatibility check
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                  <div className="context-bottom">
-                    <span className="status-dot" />
-                    No cloud inference. No API keys.
-                  </div>
-                </>
-              ) : (
-                <div className="file-panel">
-                  <div className="panel-section-heading">
-                    {connected ? "WORKSPACE FILES" : "SAMPLE FILES"}
-                    <button
-                      className="icon-button"
-                      title="Go to root"
-                      aria-label="Go to root folder"
-                      onClick={() => {
-                        setFolder("");
-                        setOpenFile(null);
-                      }}
-                    >
-                      <FolderOpen size={14} />
-                    </button>
-                  </div>
-                  {folder && (
-                    <button
-                      className="folder-back"
-                      onClick={() =>
-                        setFolder(folder.split("/").slice(0, -1).join("/"))
-                      }
-                    >
-                      ← Parent directory
-                    </button>
-                  )}
-                  {fileLoading && (
-                    <p className="muted">
-                      <Loader2 size={14} className="spin" />
-                      Loading files…
-                    </p>
-                  )}
-                  {fileError && (
-                    <p className="error" role="alert">
-                      {fileError}
-                    </p>
-                  )}
-                  {files.map((entry) => (
-                    <button
-                      className={`file-entry ${openFile?.path === entry.path ? "active" : ""}`}
-                      key={entry.path}
-                      onClick={() => void openEntry(entry)}
-                    >
-                      {entry.type === "directory" ? (
-                        <Folder size={14} />
-                      ) : (
-                        <FileCode2 size={14} />
-                      )}
-                      <span>{entry.name}</span>
-                      {entry.type === "directory" && <ChevronRight size={12} />}
-                    </button>
-                  ))}
-                  {!connected && (
-                    <p className="sample-notice">
-                      Illustrative project. Connect locally to browse your
-                      files.
-                    </p>
-                  )}
-                  {openFile && (
-                    <div className="file-preview">
-                      <div>
-                        <span>{openFile.path}</span>
-                        <button
-                          className="icon-button"
-                          aria-label="Close file preview"
-                          onClick={() => setOpenFile(null)}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                      <pre>{openFile.content}</pre>
-                    </div>
-                  )}
+              <div className="file-panel">
+                <div className="panel-section-heading">
+                  {connected ? "WORKSPACE FILES" : "SAMPLE FILES"}
+                  <button
+                    className="icon-button"
+                    title="Go to root"
+                    aria-label="Go to root folder"
+                    onClick={() => {
+                      setFolder("");
+                      setOpenFile(null);
+                    }}
+                  >
+                    <FolderOpen size={14} />
+                  </button>
                 </div>
-              )}
+                {folder && (
+                  <button
+                    className="folder-back"
+                    onClick={() =>
+                      setFolder(folder.split("/").slice(0, -1).join("/"))
+                    }
+                  >
+                    ← Parent directory
+                  </button>
+                )}
+                {fileLoading && (
+                  <p className="muted">
+                    <Loader2 size={14} className="spin" />
+                    Loading files…
+                  </p>
+                )}
+                {fileError && (
+                  <p className="error" role="alert">
+                    {fileError}
+                  </p>
+                )}
+                {files.map((entry) => (
+                  <button
+                    className={`file-entry ${openFile?.path === entry.path ? "active" : ""}`}
+                    key={entry.path}
+                    onClick={() => void openEntry(entry)}
+                  >
+                    {entry.type === "directory" ? (
+                      <Folder size={14} />
+                    ) : (
+                      <FileCode2 size={14} />
+                    )}
+                    <span>{entry.name}</span>
+                    {entry.type === "directory" && <ChevronRight size={12} />}
+                  </button>
+                ))}
+                {!connected && (
+                  <p className="sample-notice">
+                    Illustrative project. Connect locally to browse your files.
+                  </p>
+                )}
+                {openFile && (
+                  <div className="file-preview">
+                    <div>
+                      <span>{openFile.path}</span>
+                      <button
+                        className="icon-button"
+                        aria-label="Close file preview"
+                        onClick={() => setOpenFile(null)}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <pre>{openFile.content}</pre>
+                  </div>
+                )}
+              </div>
             </aside>
           )}
         </div>
         <footer className="statusbar">
-          <span>
-            <span className={`status-dot ${connected ? "" : "neutral"}`} />
-            {connected ? "Local runtime ready" : "Interactive demo"}
+          <span className="runtime-indicator">
+            <span
+              className={"status-dot " + (connected ? "connected" : "neutral")}
+            />
+            {connected ? "Local runtime connected" : "Preview workspace"}
           </span>
-          <span>
-            <ShieldCheck size={11} />
-            {mode === "agent" ? "Approval required" : "Read-only mode"}
-            <span className="statusbar-divider" />
-            v1.0.0
+          <span className="footer-safety">
+            Codex Local can make mistakes. Review its work.
           </span>
+          <span className="statusbar-shortcut">Ctrl ↵ to send</span>
         </footer>
       </div>
       {showConnection && (
