@@ -30,10 +30,10 @@ The workspace argument selects the project the agent may access. Start with a sm
 
 In the app’s connection settings, choose a provider, confirm its server URL, and select a model.
 
-| Provider | Default server URL | Requirements |
-| --- | --- | --- |
-| Ollama | `http://127.0.0.1:11434` | A running Ollama server and an installed model with native tool support. |
-| llama.cpp | `http://127.0.0.1:8080` | `llama-server`, a compatible model, and its correct tool-capable chat template. |
+| Provider  | Default server URL       | Requirements                                                                    |
+| --------- | ------------------------ | ------------------------------------------------------------------------------- |
+| Ollama    | `http://127.0.0.1:11434` | A running Ollama server and an installed model with native tool support.        |
+| llama.cpp | `http://127.0.0.1:8080`  | `llama-server`, a compatible model, and its correct tool-capable chat template. |
 
 For Ollama, start the service and install a tool-capable model using the commands in the model’s documentation. The app uses the provider’s native tool-call protocol rather than interpreting arbitrary prose as commands.
 
@@ -82,15 +82,15 @@ Your configured provider processes prompts and tool results. With a locally host
 
 ## Troubleshooting
 
-| Symptom | What to check |
-| --- | --- |
-| Provider cannot be reached | Start the provider and confirm its URL and port. Use the server URL, not a model-download page. |
-| Model list is empty | Install or load a model and verify it appears in your provider’s own model listing. |
-| The model writes tool JSON as text | Confirm native tool support and the correct chat template. For llama.cpp, check `--jinja` and the model’s function-calling instructions. |
-| Tool calls are rejected | Read the tool result, check the arguments, and retry with a compatible model. Never paste model-generated commands into a shell without review. |
-| A file cannot be read or edited | Confirm the runtime was started with the intended workspace. File tools cannot reach outside it. |
-| Generation is slow or stops | Check the provider logs, available RAM/VRAM, model size, context size, and provider timeout settings. |
-| The Pages demo cannot edit a project | Start the local runtime and open its localhost address. The published site is static. |
+| Symptom                              | What to check                                                                                                                                   |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider cannot be reached           | Start the provider and confirm its URL and port. Use the server URL, not a model-download page.                                                 |
+| Model list is empty                  | Install or load a model and verify it appears in your provider’s own model listing.                                                             |
+| The model writes tool JSON as text   | Confirm native tool support and the correct chat template. For llama.cpp, check `--jinja` and the model’s function-calling instructions.        |
+| Tool calls are rejected              | Read the tool result, check the arguments, and retry with a compatible model. Never paste model-generated commands into a shell without review. |
+| A file cannot be read or edited      | Confirm the runtime was started with the intended workspace. File tools cannot reach outside it.                                                |
+| Generation is slow or stops          | Check the provider logs, available RAM/VRAM, model size, context size, and provider timeout settings.                                           |
+| The Pages demo cannot edit a project | Start the local runtime and open its localhost address. The published site is static.                                                           |
 
 When reporting a problem, include your operating system, Node.js version, provider/version, model identifier, and a redacted reproduction. Do not include credentials or private project contents.
 

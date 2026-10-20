@@ -14,15 +14,15 @@ Ollama uses `/api/tags` and native `/api/chat`; llama.cpp uses `/v1/models` and 
 
 All responses use JSON except run streams. Get `GET /api/health` first. It returns `{ok,version,workspace,sessionToken,providers}`. Supply `X-Session-Token` on every subsequent API request, including file reads. The token changes on restart. Origins are checked before exposing health or API data; Host headers are restricted to loopback hosts. Requests without Origin are permitted for local CLI clients. No wildcard CORS is used.
 
-| Method | Path | Request / response |
-| --- | --- | --- |
-| POST | `/api/connect` | `{provider,baseUrl,model?}` → `{ok,provider,baseUrl,models:[{id}],model}` |
-| GET | `/api/files?path=.` | `{path,entries:[{name,path,type}]}`; types: `file`, `directory`, `symlink` |
-| GET | `/api/file?path=README.md` | `{path,content}` |
-| POST | `/api/diagnostics` | `{provider,baseUrl,model}` → `{ok,provider,model,checks:[{name,ok,detail}]}` |
-| POST | `/api/runs` | `{prompt,provider,baseUrl,model,mode:'ask'\|'agent',messages?:[]}` → SSE |
-| POST | `/api/approvals/:id` | `{approved:true\|false}` → `{ok,approved}` |
-| DELETE | `/api/runs/:id` | Cancels the active run and any pending approval |
+| Method | Path                       | Request / response                                                           |
+| ------ | -------------------------- | ---------------------------------------------------------------------------- |
+| POST   | `/api/connect`             | `{provider,baseUrl,model?}` → `{ok,provider,baseUrl,models:[{id}],model}`    |
+| GET    | `/api/files?path=.`        | `{path,entries:[{name,path,type}]}`; types: `file`, `directory`, `symlink`   |
+| GET    | `/api/file?path=README.md` | `{path,content}`                                                             |
+| POST   | `/api/diagnostics`         | `{provider,baseUrl,model}` → `{ok,provider,model,checks:[{name,ok,detail}]}` |
+| POST   | `/api/runs`                | `{prompt,provider,baseUrl,model,mode:'ask'\|'agent',messages?:[]}` → SSE     |
+| POST   | `/api/approvals/:id`       | `{approved:true\|false}` → `{ok,approved}`                                   |
+| DELETE | `/api/runs/:id`            | Cancels the active run and any pending approval                              |
 
 Run SSE events use `event: <type>` followed by a JSON `data:` line:
 
