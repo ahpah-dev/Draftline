@@ -22,7 +22,7 @@ export const initialThreads: Thread[] = [
         id: "demo-a",
         role: "assistant",
         content:
-          "This is a small TypeScript application. The entry point is `src/app.ts`, and runtime configuration lives in `src/config.ts`.\n\nStart with `npm run dev` for development, or `npm test` to run the checks. A good next step is to add input validation to the configuration loader.\n\nThis is an illustrative demo. Connect a local runtime to explore your own project.",
+          "This is a small TypeScript application. The entry point is `src/app.ts`, and runtime configuration lives in `src/config.ts`.\n\n### Key Highlights\n- **Entry point**: `src/app.ts` creates the HTTP server\n- **Configuration**: `src/config.ts` loads environment settings\n\n```bash\nnpm run dev # start development server\nnpm test    # run test suite\n```\n\nA good next step is to add input validation to the configuration loader.\n\n> Connect a local runtime to explore and edit your own project.",
         demo: true,
       },
     ],

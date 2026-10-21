@@ -1,7 +1,7 @@
 {
   "name": "draftline",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "A local-first agentic coding workspace for Ollama and llama.cpp.",
   "engines": {

@@ -12,6 +12,7 @@ import {
 } from "./agent.mjs";
 import { listFiles, readFile, inside } from "./paths.mjs";
 import { pickDirectory as nativePickDirectory } from "./folder-picker.mjs";
+import { createLocalModelManager } from "./local-models.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const types = {
@@ -55,6 +56,7 @@ export async function createRuntime({
   allowedOrigins = [],
   staticDir = path.join(here, "..", "dist"),
   pickDirectory = nativePickDirectory,
+  localModels = createLocalModelManager(),
 } = {}) {
   let root = await fs.realpath(path.resolve(workspace));
   if (!(await fs.stat(root)).isDirectory())
@@ -67,6 +69,7 @@ export async function createRuntime({
     workspace: root,
     sessionToken,
     workspacePicker: true,
+    localModelLoader: true,
     providers: ["ollama", "llamacpp"],
   });
   const configuredOrigins = new Set(
@@ -212,6 +215,62 @@ export async function createRuntime({
           response.removeListener("close", disconnected);
           folderSelection = null;
         }
+      }
+      if (url.pathname === "/api/llamacpp/local" && request.method === "GET") {
+        return send(
+          200,
+          url.searchParams.has("refresh")
+            ? await localModels.refresh()
+            : localModels.snapshot(),
+        );
+      }
+      const localAction =
+        /^\/api\/llamacpp\/(pick-model|pick-engine|start|stop)$/.exec(
+          url.pathname,
+        )?.[1];
+      if (localAction && request.method === "POST") {
+        const body = await jsonBody(request);
+        if (!sameToken(request.headers["x-session-token"], sessionToken))
+          return send(401, {
+            error: "The workspace session changed. Reconnect to the runtime.",
+          });
+        if (runs.size)
+          return send(409, {
+            error:
+              "Finish or stop the current task before changing local models.",
+          });
+        const keys =
+          body && typeof body === "object" && !Array.isArray(body)
+            ? Object.keys(body)
+            : null;
+        if (
+          !keys ||
+          (localAction === "start"
+            ? keys.length !== 1 ||
+              keys[0] !== "modelId" ||
+              typeof body.modelId !== "string"
+            : keys.length !== 0)
+        )
+          return send(400, {
+            error:
+              "Use the local model list and native file picker. Paths and engine arguments are not accepted.",
+          });
+        if (localAction.startsWith("pick-")) {
+          const controller = providerController(response);
+          return send(
+            200,
+            await localModels.pick(
+              localAction === "pick-engine" ? "engine" : "model",
+              controller.signal,
+            ),
+          );
+        }
+        return send(
+          200,
+          localAction === "start"
+            ? await localModels.start(body.modelId)
+            : await localModels.stop(),
+        );
       }
       if (url.pathname === "/api/connect" && request.method === "POST") {
         const config = providerConfig(await jsonBody(request));
@@ -415,9 +474,12 @@ export async function createRuntime({
     close: () =>
       new Promise((resolve, reject) => {
         folderSelection?.abort();
+        const closingModels = localModels.close();
         for (const controller of providerRequests) controller.abort();
         for (const run of runs.values()) run.controller.abort();
-        server.close((error) => (error ? reject(error) : resolve()));
+        server.close((error) => {
+          closingModels.then(() => (error ? reject(error) : resolve()), reject);
+        });
         server.closeIdleConnections();
       }),
   };

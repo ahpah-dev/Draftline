@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { health, request } from "./api";
 import type { Health, Provider, Settings } from "./types";
+import LocalModelLoader from "./LocalModelLoader";
 
 type Props = {
   settings: Settings;
@@ -156,7 +157,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
     };
   }
 
-  async function connect() {
+  async function connect(override?: Settings) {
     const controller = new AbortController();
     controllerRef.current?.abort();
     controllerRef.current = controller;
@@ -166,7 +167,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
     setModels([]);
     setDiagnostics(null);
     try {
-      const config = checkedSettings();
+      const config = override || checkedSettings();
       const runtime = await health(config, controller.signal);
       if (!runtime.ok || !runtime.sessionToken)
         throw new Error(
@@ -342,6 +343,16 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
           </button>
         </div>
 
+        {form.provider === "llamacpp" && (
+          <LocalModelLoader
+            settings={form}
+            preferredModel={settings.model}
+            onLoaded={(next) => {
+              setForm(next);
+              void connect(next);
+            }}
+          />
+        )}
         <div className="conn-fields">
           <div className="field">
             <label htmlFor="provider-url">
@@ -398,7 +409,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
           <button
             className="button secondary"
             type="button"
-            onClick={connect}
+            onClick={() => void connect()}
             disabled={!!busy}
           >
             {busy === "connect" ? (

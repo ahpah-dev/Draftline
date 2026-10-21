@@ -2,8 +2,10 @@ import BrandMark from "./BrandMark";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { enterMotion } from "./motion";
 import RunProgress from "./RunProgress";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import FormattedText from "./FormattedText";
+import React, { useEffect, useRef, useState, type FormEvent } from "react";
 import {
+  ArrowDown,
   ArrowRight,
   ArrowUp,
   Check,
@@ -92,32 +94,29 @@ function formatTime(time: number) {
           day: "numeric",
         });
 }
-function Text({ content }: { content: string }) {
+const MessageRow = React.memo(function MessageRow({
+  message,
+}: {
+  message: Message;
+}) {
   return (
-    <div className="message-text">
-      {content
-        .split(/(```[\s\S]*?```)/g)
-        .map((part, i) =>
-          part.startsWith("```") ? (
-            <pre key={i}>
-              {part.replace(/^```[^\n]*\n?/, "").replace(/```$/, "")}
-            </pre>
-          ) : (
-            <span key={i}>
-              {part
-                .split(/(`[^`]+`)/g)
-                .map((word, j) =>
-                  word.startsWith("`") ? (
-                    <code key={j}>{word.slice(1, -1)}</code>
-                  ) : (
-                    word
-                  ),
-                )}
-            </span>
-          ),
-        )}
-    </div>
+    <article className={`message ${message.role}`}>
+      <div className={`message-avatar ${message.role}`}>
+        {message.role === "user" ? "Y" : <BrandMark size={18} />}
+      </div>
+      <div className="message-body">
+        <div className="message-heading">
+          {message.role === "user" ? "You" : "Draftline"}
+          {message.demo && <span>Demo</span>}
+        </div>
+        <FormattedText content={message.content} />
+      </div>
+    </article>
   );
+});
+
+function Text({ content }: { content: string }) {
+  return <FormattedText content={content} />;
 }
 function ToolRow({ tool }: { tool: ToolEvent }) {
   return (
@@ -199,6 +198,8 @@ export default function App() {
   const messageEnd = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const followOutput = useRef(true);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const scrollTicking = useRef(false);
   const reducedMotion = useReducedMotion();
   const sidebarRef = useRef<HTMLElement>(null);
   const mainShellRef = useRef<HTMLDivElement>(null);
@@ -305,24 +306,15 @@ export default function App() {
   }, [mobileSidebar]);
   useEffect(() => {
     followOutput.current = true;
+    setShowScrollBottom(false);
   }, [selected]);
   useEffect(() => {
     if (!followOutput.current) return;
-    const frame = requestAnimationFrame(() => {
-      const messages = messagesRef.current;
-      messages?.scrollTo({
-        top: messages.scrollHeight,
-        behavior: reducedMotion ? "instant" : "smooth",
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [
-    selected,
-    active?.messages.length,
-    active?.tools.length,
-    approval,
-    reducedMotion,
-  ]);
+    const messages = messagesRef.current;
+    if (messages) {
+      messages.scrollTop = messages.scrollHeight;
+    }
+  }, [selected, active?.messages.length, active?.tools.length, approval]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
@@ -1229,34 +1221,31 @@ export default function App() {
                   className="conversation-messages"
                   aria-live="polite"
                   ref={messagesRef}
+                  onWheel={(e) => {
+                    if (e.deltaY < 0) {
+                      followOutput.current = false;
+                      setShowScrollBottom(true);
+                    }
+                  }}
                   onScroll={() => {
-                    const el = messagesRef.current;
-                    if (el)
-                      followOutput.current =
-                        el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+                    if (!scrollTicking.current) {
+                      scrollTicking.current = true;
+                      requestAnimationFrame(() => {
+                        const el = messagesRef.current;
+                        if (el) {
+                          const dist =
+                            el.scrollHeight - el.scrollTop - el.clientHeight;
+                          const isNearBottom = dist < 48;
+                          followOutput.current = isNearBottom;
+                          setShowScrollBottom(!isNearBottom);
+                        }
+                        scrollTicking.current = false;
+                      });
+                    }
                   }}
                 >
                   {active.messages.map((message) => (
-                    <m.article
-                      {...enterMotion}
-                      className={`message ${message.role}`}
-                      key={message.id}
-                    >
-                      <div className={`message-avatar ${message.role}`}>
-                        {message.role === "user" ? (
-                          "Y"
-                        ) : (
-                          <BrandMark size={18} />
-                        )}
-                      </div>
-                      <div className="message-body">
-                        <div className="message-heading">
-                          {message.role === "user" ? "You" : "Draftline"}
-                          {message.demo && <span>Demo</span>}
-                        </div>
-                        <Text content={message.content} />
-                      </div>
-                    </m.article>
+                    <MessageRow message={message} key={message.id} />
                   ))}
                   {active.tools.length > 0 && (
                     <div className="tools-block">
@@ -1325,6 +1314,27 @@ export default function App() {
                   <AnimatePresence>
                     {busy && <RunProgress status={runStatus} />}
                   </AnimatePresence>
+                  {showScrollBottom && (
+                    <button
+                      type="button"
+                      className="scroll-bottom-button"
+                      onClick={() => {
+                        followOutput.current = true;
+                        setShowScrollBottom(false);
+                        const el = messagesRef.current;
+                        if (el) {
+                          el.scrollTo({
+                            top: el.scrollHeight,
+                            behavior: "smooth",
+                          });
+                        }
+                      }}
+                      aria-label="Scroll to newest messages"
+                    >
+                      <ArrowDown size={13} />
+                      <span>Scroll to bottom</span>
+                    </button>
+                  )}
                   <div ref={messageEnd} />
                 </div>
                 <div className="conversation-composer">

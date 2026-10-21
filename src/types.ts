@@ -41,6 +41,7 @@ export type Health = {
   sessionToken: string;
   version: string;
   workspacePicker?: boolean;
+  localModelLoader?: boolean;
 };
 export type FileEntry = {
   name: string;
