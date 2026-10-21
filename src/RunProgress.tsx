@@ -26,7 +26,7 @@ export default function RunProgress({ status }: { status: string }) {
       </div>
       {seconds >= 18 && (
         <p className="run-patience">
-          Antigravity agent is coordinating tools and models. You can stop at any time.
+          Draftline is coordinating tools and models. You can stop at any time.
         </p>
       )}
     </m.div>

@@ -24,7 +24,7 @@ export default function BrandMark({ size = 24 }: { size?: number }) {
           <stop offset="100%" stopColor="#D96570" />
         </linearGradient>
       </defs>
-      {/* Primary 4-point Antigravity Star */}
+      {/* Primary 4-point star */}
       <path
         d="M12 2C12 7.523 7.523 12 2 12C7.523 12 12 16.477 12 22C12 16.477 16.477 12 22 12C16.477 12 12 7.523 12 2Z"
         fill={`url(#${gradId})`}

@@ -111,7 +111,7 @@ const MessageRow = React.memo(function MessageRow({
       <div className="message-body">
         <div className="message-heading">
           <span className="sender-name">
-            {message.role === "user" ? "You" : "Antigravity Agent"}
+            {message.role === "user" ? "You" : "Draftline"}
           </span>
           {message.role === "assistant" && (
             <span className="agy-model-badge">
@@ -863,7 +863,7 @@ export default function App() {
         <div className="sidebar-top">
           <a
             className="brand"
-            aria-label="Antigravity home"
+            aria-label="Draftline home"
             href="#"
             onClick={(e) => {
               e.preventDefault();
@@ -873,7 +873,7 @@ export default function App() {
             <span className="brand-mark">
               <BrandMark size={22} />
             </span>
-            <span>Antigravity</span>
+            <span>Draftline</span>
             <span className="brand-local">2.0</span>
           </a>
           <button
@@ -1101,7 +1101,7 @@ export default function App() {
                 <div className="hero">
                   <div className="hero-kicker">
                     <BrandMark size={15} />
-                    <span>Google Antigravity Architecture · Local Agent</span>
+                    <span>Local agent workspace</span>
                   </div>
                   <h1 className="hero-title">What would you like to build?</h1>
                   <p className="hero-subtitle">
