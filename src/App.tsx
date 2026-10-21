@@ -768,10 +768,10 @@ export default function App() {
       />
       <div className="slash-commands-bar">
         {[
-          { cmd: "/plan", label: "Plan", title: "Step-by-step implementation plan" },
-          { cmd: "/goal", label: "Goal", title: "Autonomous pair programming loop" },
-          { cmd: "/review", label: "Review", title: "Review workspace code for improvements" },
-          { cmd: "/test", label: "Test", title: "Run test suite and fix failures" },
+          { cmd: "/plan", label: "Outline steps", title: "Step-by-step implementation plan" },
+          { cmd: "/goal", label: "Auto-run", title: "Autonomous pair programming loop" },
+          { cmd: "/review", label: "Audit code", title: "Review workspace code for improvements" },
+          { cmd: "/test", label: "Run checks", title: "Run test suite and fix failures" },
         ].map((sc) => (
           <button
             key={sc.cmd}
@@ -871,10 +871,9 @@ export default function App() {
             }}
           >
             <span className="brand-mark">
-              <BrandMark size={22} />
+              <BrandMark size={20} />
             </span>
-            <span>Draftline</span>
-            <span className="brand-local">2.0</span>
+            <span className="brand-name">Draftline</span>
           </a>
           <button
             className="icon-button sidebar-toggle"
@@ -1100,33 +1099,13 @@ export default function App() {
               <m.div className="home-view" key="home" {...enterMotion}>
                 <div className="hero">
                   <div className="hero-kicker">
-                    <BrandMark size={15} />
+                    <BrandMark size={14} />
                     <span>Local agent workspace</span>
                   </div>
                   <h1 className="hero-title">What would you like to build?</h1>
                   <p className="hero-subtitle">
                     Autonomous pair-programming agent with native workspace tools and verified approvals.
                   </p>
-                </div>
-                <div className="workspace-select-row">
-                  <button
-                    className="workspace-select"
-                    onClick={() => void chooseWorkspace()}
-                    disabled={busy || pickingWorkspace}
-                    title={health?.workspace || "Choose your project folder"}
-                  >
-                    {pickingWorkspace ? (
-                      <Loader2 size={15} className="spin" />
-                    ) : (
-                      <FolderOpen size={15} />
-                    )}
-                    <span>
-                      {pickingWorkspace
-                        ? "Waiting for folder selection…"
-                        : "Open folder"}
-                    </span>
-                    <ChevronDown size={12} />
-                  </button>
                 </div>
                 {composer}
                 <div className="suggestions">
