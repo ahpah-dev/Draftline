@@ -53,7 +53,7 @@ import type {
   View,
 } from "./types";
 
-const repo = "https://github.com/ahpah-dev/codex-local";
+const repo = "https://github.com/ahpah-dev/Draftline";
 const localOrigin =
   ["localhost", "127.0.0.1"].includes(location.hostname) &&
   !["5173", "4173"].includes(location.port)
@@ -1480,7 +1480,7 @@ export default function App() {
                         className="icon-button"
                         onClick={() =>
                           void copy(
-                            "git clone https://github.com/ahpah-dev/codex-local.git draftline\ncd draftline\nnpm install\nnpm run build\nnpm start",
+                            "git clone https://github.com/ahpah-dev/Draftline.git draftline\ncd draftline\nnpm install\nnpm run build\nnpm start",
                           )
                         }
                         aria-label="Copy setup commands"
@@ -1488,7 +1488,7 @@ export default function App() {
                         <Copy size={13} />
                       </button>
                       <pre>
-                        git clone https://github.com/ahpah-dev/codex-local.git
+                        git clone https://github.com/ahpah-dev/Draftline.git
                         draftline draftline
                         {`\n`}cd draftline{`\n`}npm install{`\n`}npm run build
                         {`\n`}npm start

@@ -10,3 +10,6 @@ coverage/
 .DS_Store
 Thumbs.db
 .codex-local/
+windows-package/Draftline/
+windows-package/*.zip
+windows-package/*.exe

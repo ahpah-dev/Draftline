@@ -2,7 +2,7 @@
 
 Your models. Your workspace. A focused coding environment for local agents. Connect an Ollama or llama.cpp server, open a project, and work with an agent that can inspect files, propose edits, and run approved commands.
 
-[Open the live demo](https://ahpah-dev.github.io/codex-local/)
+[Open the live demo](https://ahpah-dev.github.io/Draftline/)
 
 Draftline is an independent, open-source project with its own identity, built for local coding workflows.
 
@@ -11,7 +11,7 @@ Draftline is an independent, open-source project with its own identity, built fo
 Requires Node.js 22 or later (Node.js 24 recommended), npm, and a running [Ollama](https://ollama.com/) or [llama.cpp](https://github.com/ggml-org/llama.cpp) server.
 
 ```sh
-git clone https://github.com/ahpah-dev/codex-local.git draftline
+git clone https://github.com/ahpah-dev/Draftline.git draftline
 cd draftline
 npm install
 npm run build
