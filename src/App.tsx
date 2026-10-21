@@ -102,12 +102,24 @@ const MessageRow = React.memo(function MessageRow({
   return (
     <article className={`message ${message.role}`}>
       <div className={`message-avatar ${message.role}`}>
-        {message.role === "user" ? "Y" : <BrandMark size={18} />}
+        {message.role === "user" ? (
+          <span className="user-initial">Y</span>
+        ) : (
+          <BrandMark size={18} />
+        )}
       </div>
       <div className="message-body">
         <div className="message-heading">
-          {message.role === "user" ? "You" : "Draftline"}
-          {message.demo && <span>Demo</span>}
+          <span className="sender-name">
+            {message.role === "user" ? "You" : "Antigravity Agent"}
+          </span>
+          {message.role === "assistant" && (
+            <span className="agy-model-badge">
+              <span className="agy-model-dot" />
+              Agent Mode
+            </span>
+          )}
+          {message.demo && <span className="demo-badge">Demo</span>}
         </div>
         <FormattedText content={message.content} />
       </div>
@@ -754,6 +766,28 @@ export default function App() {
           }
         }}
       />
+      <div className="slash-commands-bar">
+        {[
+          { cmd: "/plan", label: "Plan", title: "Step-by-step implementation plan" },
+          { cmd: "/goal", label: "Goal", title: "Autonomous pair programming loop" },
+          { cmd: "/review", label: "Review", title: "Review workspace code for improvements" },
+          { cmd: "/test", label: "Test", title: "Run test suite and fix failures" },
+        ].map((sc) => (
+          <button
+            key={sc.cmd}
+            type="button"
+            className="slash-cmd-pill"
+            onClick={() => {
+              setPrompt((prev) => (prev.startsWith(sc.cmd) ? prev : `${sc.cmd} ${prev}`.trim()));
+              textArea.current?.focus();
+            }}
+            title={sc.title}
+          >
+            <span className="slash-cmd-tag">{sc.cmd}</span>
+            <span className="slash-cmd-label">{sc.label}</span>
+          </button>
+        ))}
+      </div>
       <div className="composer-bottom">
         <div className="composer-controls">
           <button
@@ -829,7 +863,7 @@ export default function App() {
         <div className="sidebar-top">
           <a
             className="brand"
-            aria-label="Draftline home"
+            aria-label="Antigravity home"
             href="#"
             onClick={(e) => {
               e.preventDefault();
@@ -837,9 +871,10 @@ export default function App() {
             }}
           >
             <span className="brand-mark">
-              <BrandMark size={25} />
+              <BrandMark size={22} />
             </span>
-            <span>Draftline</span>
+            <span>Antigravity</span>
+            <span className="brand-local">2.0</span>
           </a>
           <button
             className="icon-button sidebar-toggle"
@@ -1000,11 +1035,14 @@ export default function App() {
               <Menu size={19} />
             </button>
             <button
-              className="product-switch"
-              onClick={openConnection}
-              disabled={busy}
+              className="topbar-workspace-pill"
+              onClick={() => void chooseWorkspace()}
+              disabled={busy || pickingWorkspace}
+              title={health?.workspace || "Choose your project folder"}
             >
-              Draftline <ChevronDown size={15} />
+              <FolderOpen size={14} className="topbar-folder-icon" />
+              <span className="topbar-workspace-name">{workspace}</span>
+              <ChevronDown size={11} />
             </button>
             <span className="view-label">
               {view === "activity"
@@ -1012,16 +1050,20 @@ export default function App() {
                 : view === "guide"
                   ? "Getting started"
                   : active
-                    ? "Task"
+                    ? "Agent Session"
                     : ""}
             </span>
           </div>
           <div className="topbar-actions">
-            {!connected && (
-              <span className="preview-badge">
-                {health ? "No model" : "Preview"}
-              </span>
-            )}
+            <button
+              className={`topbar-model-pill ${connected ? "connected" : ""}`}
+              onClick={() => openConnection()}
+              disabled={busy}
+              title={connected ? `Connected: ${settings.model}` : "Connect local model"}
+            >
+              <span className="status-dot" />
+              <span>{connected ? (settings.model || settings.provider) : "Connect Model"}</span>
+            </button>
             <AppearanceMenu />
             <button
               className={`icon-button files-toggle ${rightTab === "files" ? "active" : ""}`}
@@ -1048,15 +1090,6 @@ export default function App() {
             >
               <Github size={18} />
             </a>
-            <span className="topbar-separator" />
-            <button
-              className={`connection-status ${connected ? "connected" : ""}`}
-              onClick={() => openConnection()}
-              disabled={busy}
-            >
-              <span className="status-dot" />
-              {connected ? "Connected" : "Connect model"}
-            </button>
           </div>
         </header>
         <div
@@ -1067,11 +1100,13 @@ export default function App() {
               <m.div className="home-view" key="home" {...enterMotion}>
                 <div className="hero">
                   <div className="hero-kicker">
-                    <BrandMark size={18} />
-                    <span>Local models. Real work.</span>
+                    <BrandMark size={15} />
+                    <span>Google Antigravity Architecture · Local Agent</span>
                   </div>
-                  <h1>Build on your own terms.</h1>
-                  <p>Local intelligence. A workspace that stays yours.</p>
+                  <h1 className="hero-title">What would you like to build?</h1>
+                  <p className="hero-subtitle">
+                    Autonomous pair-programming agent with native workspace tools and verified approvals.
+                  </p>
                 </div>
                 <div className="workspace-select-row">
                   <button

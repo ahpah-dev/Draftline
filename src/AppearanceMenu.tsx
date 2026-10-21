@@ -54,7 +54,7 @@ export default function AppearanceMenu() {
         ?.setAttribute(
           "content",
           document.documentElement.dataset.theme === "dark"
-            ? "#212121"
+            ? "#121316"
             : "#ffffff",
         );
     };

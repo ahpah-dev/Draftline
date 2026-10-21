@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#252321"/><g fill="none" stroke-width="3" stroke-linejoin="round"><path d="M13 11h10c9 0 14 5 14 13s-5 13-14 13H13V11Z" stroke="#faf8f5"/><path d="M20 18h4c4 0 7 2 7 6s-3 6-7 6h-4" stroke="#e8a17c" stroke-linecap="round"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="agy-fav" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#4285F4"/>
+      <stop offset="50%" stopColor="#9B72CF"/>
+      <stop offset="100%" stopColor="#D96570"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="#131316"/>
+  <path d="M24 6C24 15.941 15.941 24 6 24C15.941 24 24 32.059 24 42C24 32.059 32.059 24 42 24C32.059 24 24 15.941 24 6Z" fill="url(#agy-fav)"/>
+  <path d="M36 6C36 8.761 33.761 11 31 11C33.761 11 36 13.239 36 16C36 13.239 38.239 11 41 11C38.239 11 36 8.761 36 6Z" fill="url(#agy-fav)" opacity="0.85"/>
+</svg>
