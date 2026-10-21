@@ -222,6 +222,47 @@ for (const provider of ["ollama", "llamacpp"]) {
   });
 }
 
+test("llamacpp: null optional tool_calls is a valid completed assistant response", async (t) => {
+  const f = await fixture(t, "llamacpp", () => ({
+    role: "assistant",
+    content: "Ready to code.",
+    tool_calls: null,
+  }));
+  const events = await run(f);
+  assert.equal(events.at(-1).data.state, "completed");
+  assert.equal(events.at(-1).data.messages.at(-1).content, "Ready to code.");
+});
+
+test("llamacpp: legacy flat native calls preserve IDs and complete the tool round-trip", async (t) => {
+  let count = 0;
+  const f = await fixture(t, "llamacpp", (input) => {
+    if (count++ === 0)
+      return {
+        content: null,
+        tool_calls: [
+          {
+            id: "legacy-native",
+            name: "read_file",
+            arguments: '{"path":"hello.txt"}',
+          },
+        ],
+      };
+    assert.equal(input.messages.at(-1).tool_call_id, "legacy-native");
+    assert.match(
+      JSON.parse(input.messages.at(-1).content).content,
+      /hello workspace/,
+    );
+    return { content: "Read successfully.", tool_calls: null };
+  });
+  const events = await run(f);
+  assert.equal(events.at(-1).data.state, "completed");
+  assert.ok(
+    events.some(
+      ({ type, data }) => type === "tool" && data.state === "completed",
+    ),
+  );
+});
+
 test("malformed tool JSON and file failures return structured error feedback to the model", async (t) => {
   let count = 0;
   const f = await fixture(t, "llamacpp", (input) => {

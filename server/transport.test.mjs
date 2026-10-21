@@ -71,6 +71,75 @@ for (const phase of ["headers", "body"]) {
   });
 }
 
+for (const operation of ["models", "chat"]) {
+  test(`llamacpp ${operation}: waits through explicit model-loading responses`, async (t) => {
+    let calls = 0;
+    const baseUrl = await provider(t, (_req, res) => {
+      if (calls++ === 0) {
+        res.writeHead(503);
+        res.end(
+          JSON.stringify({
+            error: { type: "unavailable_error", message: "Loading model" },
+          }),
+        );
+      } else
+        res.end(
+          JSON.stringify(
+            operation === "models"
+              ? { data: [{ id: "local" }] }
+              : {
+                  choices: [
+                    { message: { content: "Loaded.", tool_calls: null } },
+                  ],
+                },
+          ),
+        );
+    });
+    const config = { provider: "llamacpp", baseUrl, model: "local" };
+    const result =
+      operation === "models"
+        ? await models(config)
+        : await chat(config, [], []);
+    assert.equal(calls, 2);
+    assert.deepEqual(
+      result,
+      operation === "models" ? [{ id: "local" }] : { content: "Loaded." },
+    );
+  });
+}
+
+test("llamacpp: general server errors never replay a generation request", async (t) => {
+  let calls = 0;
+  const baseUrl = await provider(t, (_req, res) => {
+    calls++;
+    res.writeHead(503);
+    res.end(JSON.stringify({ error: { message: "Server is unavailable" } }));
+  });
+  await assert.rejects(
+    chat({ provider: "llamacpp", baseUrl, model: "local" }, [], []),
+    /Server is unavailable/,
+  );
+  assert.equal(calls, 1);
+});
+
+test("llamacpp: loading waits can be cancelled without sending another request", async (t) => {
+  let calls = 0;
+  const loading = Promise.withResolvers();
+  const baseUrl = await provider(t, (_req, res) => {
+    calls++;
+    res.writeHead(503);
+    res.end(JSON.stringify({ error: { message: "Loading model" } }));
+    loading.resolve();
+  });
+  const controller = new AbortController();
+  const pending = models({ provider: "llamacpp", baseUrl }, controller.signal);
+  const rejected = assert.rejects(pending, /Run cancelled/);
+  await loading.promise;
+  controller.abort();
+  await rejected;
+  assert.equal(calls, 1);
+});
+
 test("provider responses reject redirects, invalid JSON, and oversized bodies", async (t) => {
   const url = await provider(t, (req, res) => {
     if (req.url === "/redirect") {

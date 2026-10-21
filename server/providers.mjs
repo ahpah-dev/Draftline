@@ -1,4 +1,5 @@
 import { providerRequest as request } from "./transport.mjs";
+import { setTimeout as delay } from "node:timers/promises";
 
 export function providerConfig(input) {
   if (!input || !["ollama", "llamacpp"].includes(input.provider))
@@ -6,7 +7,7 @@ export function providerConfig(input) {
   const defaultUrl =
     input.provider === "ollama"
       ? "http://127.0.0.1:11434"
-      : "http://127.0.0.1:8080";
+      : "http://127.0.0.1:9931";
   let url;
   try {
     url = new URL(input.baseUrl || defaultUrl);
@@ -37,9 +38,48 @@ export function providerConfig(input) {
   };
 }
 
+async function providerRequest(config, endpoint, options = {}, onWaiting) {
+  let reportedLoading = false;
+  for (;;) {
+    try {
+      return await request(config.baseUrl + endpoint, options);
+    } catch (error) {
+      if (options.signal?.aborted) throw new Error("Run cancelled.");
+      // A documented loading response means generation has not started. Never
+      // replay requests after connection loss or other ambiguous failures.
+      if (
+        config.provider === "llamacpp" &&
+        error.status === 503 &&
+        /loading model|model (?:is )?loading/i.test(error.providerMessage || "")
+      ) {
+        if (!reportedLoading) {
+          onWaiting?.();
+          reportedLoading = true;
+        }
+        try {
+          await delay(800, undefined, { signal: options.signal });
+        } catch {
+          throw new Error("Run cancelled.");
+        }
+        continue;
+      }
+      if (
+        config.provider === "llamacpp" &&
+        ["ECONNREFUSED", "ENOTFOUND"].includes(error.code)
+      ) {
+        throw new Error(
+          `llama.cpp is not reachable at ${config.baseUrl}. Start llama-server with your GGUF, --jinja, and the port in this URL. Keep the server running, then reconnect.`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+  }
+}
+
 export async function models(config, signal) {
   const endpoint = config.provider === "ollama" ? "/api/tags" : "/v1/models";
-  const result = await request(config.baseUrl + endpoint, {
+  const result = await providerRequest(config, endpoint, {
     signal,
   });
   const list =
@@ -51,7 +91,13 @@ export async function models(config, signal) {
   return list.filter((model) => typeof model.id === "string" && model.id);
 }
 
-export async function chat(config, messages, tools, signal) {
+export async function chat(
+  config,
+  messages,
+  tools,
+  signal,
+  { onWaiting } = {},
+) {
   if (!config.model) throw new Error("Select a model before starting a run.");
   const payload = {
     model: config.model,
@@ -59,17 +105,26 @@ export async function chat(config, messages, tools, signal) {
     stream: false,
     tools,
     ...(config.provider === "llamacpp"
-      ? { tool_choice: "auto", parallel_tool_calls: false, temperature: 0.2 }
+      ? {
+          tool_choice: "auto",
+          parallel_tool_calls: false,
+          temperature: 0.2,
+        }
       : { options: { temperature: 0.2 } }),
   };
   const endpoint =
     config.provider === "ollama" ? "/api/chat" : "/v1/chat/completions";
-  const result = await request(config.baseUrl + endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal,
-  });
+  const result = await providerRequest(
+    config,
+    endpoint,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    },
+    onWaiting,
+  );
   const message =
     config.provider === "ollama"
       ? result.message
@@ -83,8 +138,17 @@ export async function chat(config, messages, tools, signal) {
     );
   if (!message || typeof message !== "object" || Array.isArray(message))
     throw new Error("Provider did not return an assistant message.");
-  if (message.tool_calls !== undefined && !Array.isArray(message.tool_calls))
+  if (message.tool_calls != null && !Array.isArray(message.tool_calls))
     throw new Error("Provider tool_calls must be an array.");
+  if (message.tool_calls == null) delete message.tool_calls;
+  if (config.provider === "llamacpp" && message.tool_calls) {
+    // Older llama.cpp releases returned flat {name, arguments} tool entries.
+    message.tool_calls = message.tool_calls.map((call) =>
+      call && !call.function && typeof call.name === "string"
+        ? { ...call, function: { name: call.name, arguments: call.arguments } }
+        : call,
+    );
+  }
   if (
     message.content !== undefined &&
     message.content !== null &&

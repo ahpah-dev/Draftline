@@ -1,18 +1,18 @@
-# Codex Local
+# Draftline
 
-A focused, Codex-inspired coding workspace for local models. Connect an Ollama or llama.cpp server, open a project, and work with an agent that can inspect files, propose edits, and run approved commands.
+Your models. Your workspace. A focused coding environment for local agents. Connect an Ollama or llama.cpp server, open a project, and work with an agent that can inspect files, propose edits, and run approved commands.
 
 [Open the live demo](https://ahpah-dev.github.io/codex-local/)
 
-Codex Local is an independent community project. It is not affiliated with, endorsed by, or an official product of OpenAI. OpenAI and Codex are trademarks of their respective owners.
+Draftline is an independent, open-source project with its own identity, built for local coding workflows.
 
 ## Run locally
 
 Requires Node.js 22 or later (Node.js 24 recommended), npm, and a running [Ollama](https://ollama.com/) or [llama.cpp](https://github.com/ggml-org/llama.cpp) server.
 
 ```sh
-git clone https://github.com/ahpah-dev/codex-local.git
-cd codex-local
+git clone https://github.com/ahpah-dev/codex-local.git draftline
+cd draftline
 npm install
 npm run build
 npm start
@@ -37,14 +37,14 @@ In the app’s connection settings, choose a provider, confirm its server URL, a
 | Provider  | Default server URL       | Requirements                                                                    |
 | --------- | ------------------------ | ------------------------------------------------------------------------------- |
 | Ollama    | `http://127.0.0.1:11434` | A running Ollama server and an installed model with native tool support.        |
-| llama.cpp | `http://127.0.0.1:8080`  | `llama-server`, a compatible model, and its correct tool-capable chat template. |
+| llama.cpp | `http://127.0.0.1:9931`  | `llama-server`, a compatible model, and its correct tool-capable chat template. |
 
 For Ollama, start the service and install a tool-capable model using the commands in the model’s documentation. The app uses the provider’s native tool-call protocol rather than interpreting arbitrary prose as commands.
 
 For llama.cpp, a typical server invocation is:
 
 ```sh
-llama-server -m /path/to/tool-capable-model.gguf --port 8080 --jinja
+llama-server -m /path/to/tool-capable-model.gguf --host 127.0.0.1 --port 9931 --jinja
 ```
 
 Use the model’s recommended template and server options. `--jinja` enables the template machinery; it does not give every model tool support. See the official [llama.cpp function calling guide](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md) for model-specific requirements.
@@ -73,7 +73,7 @@ Vite uses a relative asset base so the build supports project sites under a repo
 
 ## Trust and security
 
-Run Codex Local only with projects and model servers you trust. Treat repository contents, model output, and tool requests as untrusted input.
+Run Draftline only with projects and model servers you trust. Treat repository contents, model output, and tool requests as untrusted input.
 
 - File tools are confined to the selected workspace. The runtime rejects paths outside that workspace.
 - Changes and command execution use approval prompts. Read each request before approving it.

@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { enterMotion } from "./motion";
 import RunProgress from "./RunProgress";
@@ -57,8 +58,8 @@ const localOrigin =
     ? location.origin
     : "http://127.0.0.1:4318";
 const defaults: Settings = {
-  provider: "ollama",
-  baseUrl: "http://localhost:11434",
+  provider: "llamacpp",
+  baseUrl: "http://127.0.0.1:9931",
   model: "",
   runtimeUrl: localOrigin,
 };
@@ -836,7 +837,7 @@ export default function App() {
         <div className="sidebar-top">
           <a
             className="brand"
-            aria-label="Codex Local home"
+            aria-label="Draftline home"
             href="#"
             onClick={(e) => {
               e.preventDefault();
@@ -844,11 +845,9 @@ export default function App() {
             }}
           >
             <span className="brand-mark">
-              <Terminal size={22} strokeWidth={1.8} />
+              <BrandMark size={25} />
             </span>
-            <span>
-              Codex<span className="brand-local">Local</span>
-            </span>
+            <span>Draftline</span>
           </a>
           <button
             className="icon-button sidebar-toggle"
@@ -1013,7 +1012,7 @@ export default function App() {
               onClick={openConnection}
               disabled={busy}
             >
-              Codex Local <ChevronDown size={15} />
+              Draftline <ChevronDown size={15} />
             </button>
             <span className="view-label">
               {view === "activity"
@@ -1076,11 +1075,11 @@ export default function App() {
               <m.div className="home-view" key="home" {...enterMotion}>
                 <div className="hero">
                   <div className="hero-kicker">
-                    <Terminal size={16} />
-                    <span>Your local coding workspace</span>
+                    <BrandMark size={18} />
+                    <span>Local models. Real work.</span>
                   </div>
-                  <h1>What do you want to build?</h1>
-                  <p>Plan, write, and improve code with your local models.</p>
+                  <h1>Build on your own terms.</h1>
+                  <p>Local intelligence. A workspace that stays yours.</p>
                 </div>
                 <div className="workspace-select-row">
                   <button
@@ -1244,11 +1243,15 @@ export default function App() {
                       key={message.id}
                     >
                       <div className={`message-avatar ${message.role}`}>
-                        {message.role === "user" ? "Y" : <Terminal size={16} />}
+                        {message.role === "user" ? (
+                          "Y"
+                        ) : (
+                          <BrandMark size={18} />
+                        )}
                       </div>
                       <div className="message-body">
                         <div className="message-heading">
-                          {message.role === "user" ? "You" : "Codex Local"}
+                          {message.role === "user" ? "You" : "Draftline"}
                           {message.demo && <span>Demo</span>}
                         </div>
                         <Text content={message.content} />
@@ -1459,7 +1462,7 @@ export default function App() {
                   <div>
                     <h2>Open your workspace</h2>
                     <p>
-                      Install Codex Local, build the app, and start the runtime.
+                      Install Draftline, build the app, and start the runtime.
                       Then choose your project using Open folder.
                     </p>
                     <div className="code-block">
@@ -1467,7 +1470,7 @@ export default function App() {
                         className="icon-button"
                         onClick={() =>
                           void copy(
-                            "git clone https://github.com/ahpah-dev/codex-local.git\ncd codex-local\nnpm install\nnpm run build\nnpm start",
+                            "git clone https://github.com/ahpah-dev/codex-local.git draftline\ncd draftline\nnpm install\nnpm run build\nnpm start",
                           )
                         }
                         aria-label="Copy setup commands"
@@ -1476,7 +1479,8 @@ export default function App() {
                       </button>
                       <pre>
                         git clone https://github.com/ahpah-dev/codex-local.git
-                        {`\n`}cd codex-local{`\n`}npm install{`\n`}npm run build
+                        draftline draftline
+                        {`\n`}cd draftline{`\n`}npm install{`\n`}npm run build
                         {`\n`}npm start
                       </pre>
                     </div>
@@ -1515,10 +1519,9 @@ export default function App() {
                   </p>
                 </div>
                 <p className="independent-note">
-                  An independent, open-source project inspired by the focus of
-                  Codex. Not affiliated with or endorsed by OpenAI.
-                  Compatibility depends on your model, template, and provider
-                  version.
+                  Draftline is an independent, open-source workspace for local
+                  coding. Tool compatibility depends on your model, chat
+                  template, and provider version.
                 </p>
               </m.div>
             )}
@@ -1646,7 +1649,7 @@ export default function App() {
             {health ? "Local runtime connected" : "Preview workspace"}
           </span>
           <span className="footer-safety">
-            Codex Local can make mistakes. Review its work.
+            Draftline can make mistakes. Review its work.
           </span>
           <span className="statusbar-shortcut">Ctrl ↵ to send</span>
         </footer>

@@ -83,20 +83,26 @@ export function providerRequest(
             incoming.statusCode >= 300 ||
             data.error
           ) {
-            finish(
-              new Error(
-                `Provider error (${incoming.statusCode}): ${typeof data.error === "string" ? data.error : data.error?.message || text.slice(0, 400)}`,
-              ),
+            const error = new Error(
+              `Provider error (${incoming.statusCode}): ${typeof data.error === "string" ? data.error : data.error?.message || text.slice(0, 400)}`,
             );
+            error.status = incoming.statusCode;
+            error.providerMessage =
+              typeof data.error === "string" ? data.error : data.error?.message;
+            finish(error);
             return;
           }
           finish(null, data);
         });
       },
     );
-    outgoing.on("error", (error) =>
-      finish(new Error(`Cannot reach local provider: ${error.message}`)),
-    );
+    outgoing.on("error", (cause) => {
+      const error = new Error(`Cannot reach local provider: ${cause.message}`, {
+        cause,
+      });
+      error.code = cause.code;
+      finish(error);
+    });
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
     else outgoing.end(body);

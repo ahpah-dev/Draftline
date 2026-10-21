@@ -454,13 +454,13 @@ if (
     const options = parseArgs(process.argv.slice(2));
     if (options.help)
       console.log(
-        "Codex Local bridge\n\nnode server/index.mjs [--workspace <directory>] [--port 4318] [--allow-origin https://name.github.io]\n\nBinds to 127.0.0.1. Use Open folder in the app to choose or switch projects.",
+        "Draftline bridge\n\nnode server/index.mjs [--workspace <directory>] [--port 4318] [--allow-origin https://name.github.io]\n\nBinds to 127.0.0.1. Use Open folder in the app to choose or switch projects.",
       );
     else {
       const runtime = await createRuntime(options);
       const address = await runtime.listen();
       console.log(
-        `Codex Local is ready at http://127.0.0.1:${address.port}\nWorkspace: ${runtime.workspace}`,
+        `Draftline is ready at http://127.0.0.1:${address.port}\nWorkspace: ${runtime.workspace}`,
       );
       for (const signal of ["SIGINT", "SIGTERM"])
         process.once(signal, () => {
@@ -468,7 +468,7 @@ if (
         });
     }
   } catch (error) {
-    console.error(`Codex Local: ${error.message}`);
+    console.error(`Draftline: ${error.message}`);
     process.exitCode = 1;
   }
 }

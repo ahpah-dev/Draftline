@@ -24,7 +24,7 @@ type CheckResult = { name: string; ok: boolean; detail: string };
 type DiagnosticResult = { ok: boolean; checks: CheckResult[] };
 const defaults: Record<Provider, string> = {
   ollama: "http://localhost:11434",
-  llamacpp: "http://localhost:8080",
+  llamacpp: "http://127.0.0.1:9931",
 };
 
 function normalizeUrl(value: string, label: string) {
@@ -119,7 +119,7 @@ export default function ConnectionDialog({ settings, onSave, onClose }: Props) {
   const needsOrigin = !["localhost", "127.0.0.1", "[::1]", "::1"].includes(
     window.location.hostname,
   );
-  const setupCommand = `git clone https://github.com/ahpah-dev/codex-local.git\ncd codex-local\nnpm install\nnpm run build\nnpm start${needsOrigin ? ` -- --origin ${origin}` : ""}`;
+  const setupCommand = `git clone https://github.com/ahpah-dev/codex-local.git draftline\ncd draftline\nnpm install\nnpm run build\nnpm start${needsOrigin ? ` -- --origin ${origin}` : ""}`;
 
   function update(field: keyof Settings, value: string) {
     setForm((current) => ({ ...current, [field]: value }));

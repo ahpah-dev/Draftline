@@ -129,7 +129,7 @@ export default function WorkspaceDialog({
         <div className="workspace-setup">
           <strong>Start the runtime</strong>
           <p className="muted">
-            In your Codex Local checkout, run <code>git pull</code>, then{" "}
+            In your Draftline checkout, run <code>git pull</code>, then{" "}
             <code>npm install</code> and <code>npm run build</code>. Start the
             updated runtime:
           </p>
